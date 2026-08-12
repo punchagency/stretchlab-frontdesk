@@ -47,6 +47,16 @@ export const LoginForm = () => {
       }
     } catch (err) {
       const apiError = err as ApiError;
+      if (apiError.response?.status === 403 && apiError.response.data?.redirect_url) {
+        if (apiError.response.data.access_token) {
+          setUserCookie(apiError.response.data.access_token);
+        }
+        if (apiError.response.data.refresh_token) {
+          setRefreshToken(apiError.response.data.refresh_token);
+        }
+        window.location.href = apiError.response.data.redirect_url;
+        return;
+      }
       setError(apiError.response?.data?.message || "Login failed");
     } finally {
       setIsLoading(false);

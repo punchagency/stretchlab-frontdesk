@@ -5,6 +5,8 @@ export interface ApiError {
       message: string;
       access_token?: string;
       refresh_token?: string;
+      redirect_url?: string;
+      app?: string;
     };
   };
 }

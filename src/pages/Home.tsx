@@ -22,7 +22,7 @@ export const Home = () => {
   const token = getUserCookie();
 
   const [page, setPage] = useState(1);
-  const pageSize = 40; // 40 per page
+  const pageSize = 30;
 
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");

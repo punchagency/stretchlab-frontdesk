@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { Home, Gift, LogOut, X } from "lucide-react";
+import { Home, LogOut, X } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -15,11 +15,11 @@ const menuItems = [
     path: "/",
     icon: Home,
   },
-  {
-    title: "Reward Selection",
-    path: "/rewards",
-    icon: Gift,
-  },
+  // {
+  //   title: "Reward Selection",
+  //   path: "/rewards",
+  //   icon: Gift,
+  // },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
