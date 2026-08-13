@@ -4,6 +4,7 @@ import { login } from "../../service/auth";
 import { ApiError } from "../../types";
 import { setUserCookie, setRefreshToken } from "../../utils/user";
 import { useNavigate } from "react-router";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 
 export const LoginForm = () => {
   const navigate = useNavigate();
@@ -66,11 +67,11 @@ export const LoginForm = () => {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full">
       <Input
-        label="Email"
+        label="Desk Email"
         icon="mail"
         type="email"
         name="email"
-        placeholder="Enter your email"
+        placeholder="Enter your desk email"
         value={formData.email}
         onChange={handleChange}
       />
@@ -86,8 +87,8 @@ export const LoginForm = () => {
       />
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <p className="text-red-600 font-medium text-sm text-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-red-600 font-semibold text-xs text-center">
             {error}
           </p>
         </div>
@@ -96,17 +97,26 @@ export const LoginForm = () => {
       <Button
         disabled={isLoading}
         type="submit"
-        className="bg-primary-base py-4 text-white flex items-center justify-center gap-2 mt-4"
+        className="bg-primary-base hover:bg-primary-base/90 py-4 text-white font-bold rounded-xl shadow-md shadow-primary-base/20 hover:shadow-lg transition-all flex items-center justify-center gap-2 mt-2 text-base cursor-pointer"
       >
         {isLoading ? (
           <>
             <Spinner />
-            <span>Logging in...</span>
+            <span>Signing in...</span>
           </>
         ) : (
-          "Login"
+          <>
+            <span>Log in to Front Desk</span>
+            <ArrowRight className="w-4 h-4" />
+          </>
         )}
       </Button>
+
+      {/* Security Assurance */}
+      <div className="flex items-center justify-center gap-1.5 text-grey-2 text-[11px] pt-1">
+        <ShieldCheck className="w-3.5 h-3.5 text-primary-base" />
+        <span>Protected Front Desk Session</span>
+      </div>
     </form>
   );
 };
