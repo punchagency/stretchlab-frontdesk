@@ -48,3 +48,56 @@ export const getFrontdeskHome = async (params?: FrontdeskHomeParams) => {
   });
   return response;
 };
+
+export interface IntakeFormLocation {
+  location_id: string;
+  location_name: string;
+  intake_form_submissions: number;
+  first_visits: number;
+  conversion_percentage: number;
+  first_visits_from_intake_form: number;
+  matched_conversion_percentage: number;
+}
+
+export interface IntakeFormConversionData {
+  duration: string;
+  start_date: string;
+  end_date: string;
+  intake_form_submissions: number;
+  first_visits: number;
+  conversion_percentage: number;
+  first_visits_from_intake_form: number;
+  matched_conversion_percentage: number;
+  matched_by_client_id: number;
+  matched_by_name: number;
+  lookback_days: number;
+  locations: IntakeFormLocation[];
+}
+
+export interface IntakeFormConversionResponse {
+  status: string;
+  data: IntakeFormConversionData;
+}
+
+export const getIntakeFormConversion = async (params: {
+  duration?: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params.duration) {
+    queryParams.append("duration", params.duration.toLowerCase());
+  }
+  if (params.location && params.location !== "All") {
+    queryParams.append("location", params.location.toLowerCase());
+  }
+  if (params.duration === "custom" && params.startDate && params.endDate) {
+    queryParams.append("start_date", params.startDate);
+    queryParams.append("end_date", params.endDate);
+  }
+  const response = await api.get<IntakeFormConversionResponse>(
+    `/admin/dashboard/intake_form_conversion?${queryParams.toString()}`
+  );
+  return response.data;
+};

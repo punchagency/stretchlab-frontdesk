@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { Home, LogOut, X } from "lucide-react";
+import { Home, TrendingUp, LogOut, X } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -15,11 +15,11 @@ const menuItems = [
     path: "/",
     icon: Home,
   },
-  // {
-  //   title: "Reward Selection",
-  //   path: "/rewards",
-  //   icon: Gift,
-  // },
+  {
+    title: "Form Conversion Rate",
+    path: "/intake-conversion",
+    icon: TrendingUp,
+  },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
