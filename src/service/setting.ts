@@ -11,3 +11,8 @@ export const saveGiftcard = async (giftcard_id: string) => {
   });
   return response;
 };
+
+export const getMyRewards = async () => {
+  const response = await api.get("/stretchnote/settings/my-rewards");
+  return response;
+};

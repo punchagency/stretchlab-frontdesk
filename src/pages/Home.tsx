@@ -61,6 +61,7 @@ export const Home = () => {
     },
   });
 
+
   const submissions = homeData?.submissions || [];
   const locations = homeData?.locations || [];
   const totalSubmissions = homeData?.pagination?.total || 0;

@@ -453,7 +453,7 @@ export const IntakeConversion = () => {
             </div>
           </TooltipProvider>
 
-          {/* Performance Bar Chart Section */}
+
           {chartData.length > 0 && (
             <div className="bg-white p-6 rounded-3xl border border-neutral-tertiary shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-neutral-tertiary/60 pb-4">

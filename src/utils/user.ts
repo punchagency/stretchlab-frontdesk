@@ -9,6 +9,7 @@ interface CustomJwtPayload extends JwtPayload {
   username: string;
   avatar?: string;
   role_id?: number;
+  roles?: number[];
   clubready_accounts?: any[];
 }
 
@@ -40,6 +41,25 @@ export const getUserInfo = (): CustomJwtPayload | null => {
     return jwtDecode<CustomJwtPayload>(token);
   }
   return null;
+};
+
+export const getUserRoles = (user: CustomJwtPayload | null): number[] => {
+  if (!user) return [];
+  if (Array.isArray(user.roles) && user.roles.length > 0) return user.roles.map(r => Number(r));
+  if (user.role_id !== undefined && user.role_id !== null) return [Number(user.role_id)];
+  return [];
+};
+
+export const hasRole = (user: CustomJwtPayload | null, role: number | number[]): boolean => {
+  const userRoles = getUserRoles(user);
+  if (Array.isArray(role)) {
+    return role.some(r => userRoles.includes(Number(r)));
+  }
+  return userRoles.includes(Number(role));
+};
+
+export const canAccessInbox = (user: CustomJwtPayload | null): boolean => {
+  return hasRole(user, [1, 2, 4, 6]);
 };
 
 export const setRefreshToken = (token: string): void => {

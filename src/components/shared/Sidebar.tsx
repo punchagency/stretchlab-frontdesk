@@ -1,13 +1,16 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { Home, TrendingUp, LogOut, X } from "lucide-react";
+import { Home, TrendingUp, LogOut, X, ExternalLink } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
-import { deleteUserCookie, getUserInfo } from "../../utils/user";
+import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
 
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
+
+const adminURL = import.meta.env.VITE_ADMIN_URL || "https://admin.stretchnote.com";
+const noteAppURL = import.meta.env.VITE_REDIRECT_URL || "https://stretchnote.com";
 
 const menuItems = [
   {
@@ -20,12 +23,20 @@ const menuItems = [
     path: "/intake-conversion",
     icon: TrendingUp,
   },
+  // {
+  //   title: "SMS Review Inbox",
+  //   path: "/review-inbox",
+  //   icon: MessageSquare,
+  // },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const userInfo = getUserInfo();
+
+  const canAccessAdmin = hasRole(userInfo, [4]);
+  const canAccessNoteApp = hasRole(userInfo, [3]);
 
   const handleLogout = async () => {
     try {
@@ -67,8 +78,6 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         </button>
       </div>
 
-
-
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => {
@@ -92,16 +101,56 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 />
                 <span className="text-sm tracking-tight">{item.title}</span>
               </div>
-
             </Link>
           );
         })}
       </nav>
 
+      {/* Portal Switcher on Sidebar */}
+      {(canAccessAdmin || canAccessNoteApp) && (
+        <div className="px-4 py-3 border-t border-neutral-tertiary/60 space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-wider text-grey-5 px-1">
+            Switch Application
+          </p>
+
+          <div className="flex flex-col gap-1">
+            {/* Current App: Front Desk */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-primary-base/10 text-primary-base font-bold text-xs border border-primary-base/20">
+              <span>Front Desk Portal</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary-base text-white">
+                Active
+              </span>
+            </div>
+
+            {/* Switch to Admin */}
+            {canAccessAdmin && (
+              <button
+                onClick={() => window.open(adminURL, "_self")}
+                className="flex items-center justify-between px-3 py-2 rounded-xl text-dark-1 hover:bg-neutral-quaternary font-semibold text-xs transition-colors cursor-pointer w-full text-left"
+              >
+                <span>Admin Portal</span>
+                <ExternalLink className="w-3.5 h-3.5 text-grey-2" />
+              </button>
+            )}
+
+            {/* Switch to Note App */}
+            {canAccessNoteApp && (
+              <button
+                onClick={() => window.open(noteAppURL, "_self")}
+                className="flex items-center justify-between px-3 py-2 rounded-xl text-dark-1 hover:bg-neutral-quaternary font-semibold text-xs transition-colors cursor-pointer w-full text-left"
+              >
+                <span>Note Taking App</span>
+                <ExternalLink className="w-3.5 h-3.5 text-grey-2" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Footer Profile & Logout */}
       <div className="p-4 border-t border-neutral-tertiary space-y-3">
         <div className="flex items-center gap-3 p-3 bg-neutral-quaternary/40 rounded-2xl border border-neutral-tertiary/60">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-base to-primary-base text-white flex items-center justify-center font-black text-sm uppercase shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-primary-base text-white flex items-center justify-center font-black text-sm uppercase shadow-sm">
             {displayName.charAt(0)}
           </div>
           <div className="flex-1 overflow-hidden">

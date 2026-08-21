@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import "./index.css";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, IntakeConversion } from "./pages";
+import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, IntakeConversion, ReviewInbox } from "./pages";
 import { AppLayout } from "./components/shared";
 
 const queryClient = new QueryClient({
@@ -32,6 +32,15 @@ const router = createBrowserRouter([
     element: (
       <AppLayout>
         <IntakeConversion />
+      </AppLayout>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/review-inbox",
+    element: (
+      <AppLayout>
+        <ReviewInbox />
       </AppLayout>
     ),
     errorElement: <ErrorPage />,

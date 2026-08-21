@@ -5,3 +5,4 @@ export * from "./ErrorPage";
 export * from "./NotFound";
 export * from "./AcceptInvite";
 export * from "./IntakeConversion";
+export * from "./ReviewInbox";

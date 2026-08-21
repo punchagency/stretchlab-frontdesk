@@ -46,7 +46,6 @@ const formatCurrency = (min: number, max: number, currency: string) =>
 
 export const GiftCardSettings = () => {
   const queryClient = useQueryClient();
-
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
@@ -187,11 +186,10 @@ export const GiftCardSettings = () => {
             <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar pt-1 border-t border-neutral-tertiary/40">
               <button
                 onClick={() => setActiveCategory("All")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                  activeCategory === "All"
-                    ? "bg-primary-base text-white shadow-xs"
-                    : "bg-neutral-quaternary text-grey-5 hover:bg-neutral-tertiary hover:text-dark-1"
-                }`}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${activeCategory === "All"
+                  ? "bg-primary-base text-white shadow-xs"
+                  : "bg-neutral-quaternary text-grey-5 hover:bg-neutral-tertiary hover:text-dark-1"
+                  }`}
               >
                 All Rewards ({giftcards.length})
               </button>
@@ -199,11 +197,10 @@ export const GiftCardSettings = () => {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                    activeCategory === cat
-                      ? "bg-primary-base text-white shadow-xs"
-                      : "bg-neutral-quaternary text-grey-5 hover:bg-neutral-tertiary hover:text-dark-1"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${activeCategory === cat
+                    ? "bg-primary-base text-white shadow-xs"
+                    : "bg-neutral-quaternary text-grey-5 hover:bg-neutral-tertiary hover:text-dark-1"
+                    }`}
                 >
                   {cat}
                 </button>
@@ -213,124 +210,123 @@ export const GiftCardSettings = () => {
 
           {/* Gift Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((gc) => {
-          const isSelected = selectedId === gc.id;
-          const isSaved = savedId === gc.id;
-          const cardImg = gc.images.find((i) => i.type === "card") || gc.images[0];
-          const isExpanded = expandedInfoId === gc.id;
+            {filtered.map((gc) => {
+              const isSelected = selectedId === gc.id;
+              const isSaved = savedId === gc.id;
+              const cardImg = gc.images.find((i) => i.type === "card") || gc.images[0];
+              const isExpanded = expandedInfoId === gc.id;
 
-          return (
-            <div
-              key={gc.id}
-              onClick={() => setSelectedId(gc.id)}
-              className={`group text-left rounded-3xl border-2 overflow-hidden transition-all duration-300 relative flex flex-col justify-between cursor-pointer ${
-                isSelected
-                  ? "border-primary-base bg-white shadow-xl ring-4 ring-primary-base/10"
-                  : "border-neutral-tertiary hover:border-grey-3 bg-white hover:shadow-md"
-              }`}
-            >
-              <div>
-                {/* Card Visual Header */}
-                <div className="h-48 overflow-hidden bg-neutral-quaternary/60 relative p-4 flex items-center justify-center">
-                  {cardImg ? (
-                    <img
-                      src={cardImg.src}
-                      alt={gc.name}
-                      className="max-h-full w-auto object-contain rounded-xl shadow-md group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Gift className="w-16 h-16 text-grey-3" />
-                    </div>
-                  )}
+              return (
+                <div
+                  key={gc.id}
+                  onClick={() => setSelectedId(gc.id)}
+                  className={`group text-left rounded-3xl border-2 overflow-hidden transition-all duration-300 relative flex flex-col justify-between cursor-pointer ${isSelected
+                    ? "border-primary-base bg-white shadow-xl ring-4 ring-primary-base/10"
+                    : "border-neutral-tertiary hover:border-grey-3 bg-white hover:shadow-md"
+                    }`}
+                >
+                  <div>
+                    {/* Card Visual Header */}
+                    <div className="h-48 overflow-hidden bg-neutral-quaternary/60 relative p-4 flex items-center justify-center">
+                      {cardImg ? (
+                        <img
+                          src={cardImg.src}
+                          alt={gc.name}
+                          className="max-h-full w-auto object-contain rounded-xl shadow-md group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Gift className="w-16 h-16 text-grey-3" />
+                        </div>
+                      )}
 
-                  {/* Active / Selection Badge */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                    {isSaved && (
-                      <span className="text-[9px] font-black uppercase bg-green-600 text-white px-2 py-0.5 rounded-full shadow-md border border-white">
-                        Active Selection
-                      </span>
-                    )}
-                    {isSelected && (
-                      <div className="bg-primary-base text-white rounded-full p-1.5 shadow-lg">
-                        <Check className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Content Details */}
-                <div className="p-5 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-extrabold text-dark-1 text-base line-clamp-1 group-hover:text-primary-base transition-colors">
-                      {gc.name}
-                    </h3>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-grey-5 bg-neutral-quaternary px-2.5 py-1 rounded-lg border border-neutral-tertiary">
-                      {formatCategory(gc.subcategory)}
-                    </span>
-                    {gc.currency_codes?.[0] && gc.skus?.[0] && (
-                      <span className="text-[10px] font-black uppercase tracking-wider text-primary-base bg-primary-base/10 px-2.5 py-1 rounded-lg border border-primary-base/20">
-                        {formatCurrency(
-                          gc.skus[0].min,
-                          gc.skus[0].max,
-                          gc.currency_codes[0]
+                      {/* Active / Selection Badge */}
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                        {isSaved && (
+                          <span className="text-[9px] font-black uppercase bg-green-600 text-white px-2 py-0.5 rounded-full shadow-md border border-white">
+                            Active Selection
+                          </span>
                         )}
-                      </span>
-                    )}
+                        {isSelected && (
+                          <div className="bg-primary-base text-white rounded-full p-1.5 shadow-lg">
+                            <Check className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content Details */}
+                    <div className="p-5 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-extrabold text-dark-1 text-base line-clamp-1 group-hover:text-primary-base transition-colors">
+                          {gc.name}
+                        </h3>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-grey-5 bg-neutral-quaternary px-2.5 py-1 rounded-lg border border-neutral-tertiary">
+                          {formatCategory(gc.subcategory)}
+                        </span>
+                        {gc.currency_codes?.[0] && gc.skus?.[0] && (
+                          <span className="text-[10px] font-black uppercase tracking-wider text-primary-base bg-primary-base/10 px-2.5 py-1 rounded-lg border border-primary-base/20">
+                            {formatCurrency(
+                              gc.skus[0].min,
+                              gc.skus[0].max,
+                              gc.currency_codes[0]
+                            )}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-grey-5 line-clamp-2 leading-relaxed font-medium">
+                        {gc.description}
+                      </p>
+                    </div>
                   </div>
 
-                  <p className="text-xs text-grey-5 line-clamp-2 leading-relaxed font-medium">
-                    {gc.description}
-                  </p>
-                </div>
-              </div>
+                  {/* Usage Instructions Dropdown */}
+                  {gc.usage_instructions && (
+                    <div className="px-5 pb-5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedInfoId(isExpanded ? null : gc.id);
+                        }}
+                        className="w-full flex items-center justify-between text-[11px] font-bold text-grey-5 hover:text-primary-base py-1.5 px-3 bg-neutral-quaternary/40 hover:bg-neutral-quaternary rounded-xl transition-all border border-neutral-tertiary/60"
+                      >
+                        <span className="flex items-center gap-1">
+                          <Info className="w-3.5 h-3.5" />
+                          Redemption Details
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </button>
 
-              {/* Usage Instructions Dropdown */}
-              {gc.usage_instructions && (
-                <div className="px-5 pb-5">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setExpandedInfoId(isExpanded ? null : gc.id);
-                    }}
-                    className="w-full flex items-center justify-between text-[11px] font-bold text-grey-5 hover:text-primary-base py-1.5 px-3 bg-neutral-quaternary/40 hover:bg-neutral-quaternary rounded-xl transition-all border border-neutral-tertiary/60"
-                  >
-                    <span className="flex items-center gap-1">
-                      <Info className="w-3.5 h-3.5" />
-                      Redemption Details
-                    </span>
-                    {isExpanded ? (
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-2 p-3 bg-neutral-quaternary/80 border border-neutral-tertiary rounded-xl text-[11px] text-grey-5 font-mono leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
-                      {gc.usage_instructions}
+                      {isExpanded && (
+                        <div className="mt-2 p-3 bg-neutral-quaternary/80 border border-neutral-tertiary rounded-xl text-[11px] text-grey-5 font-mono leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
+                          {gc.usage_instructions}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-20 bg-white rounded-3xl border border-neutral-tertiary">
-          <CreditCard className="w-16 h-16 mx-auto text-neutral-tertiary mb-3" />
-          <h3 className="text-base font-bold text-dark-1">No reward gift cards found</h3>
-          <p className="text-grey-5 text-xs mt-1">
-            Try adjusting your search filter or selecting a different category.
-          </p>
-        </div>
-      )}
+          {filtered.length === 0 && (
+            <div className="text-center py-20 bg-white rounded-3xl border border-neutral-tertiary">
+              <CreditCard className="w-16 h-16 mx-auto text-neutral-tertiary mb-3" />
+              <h3 className="text-base font-bold text-dark-1">No reward gift cards found</h3>
+              <p className="text-grey-5 text-xs mt-1">
+                Try adjusting your search filter or selecting a different category.
+              </p>
+            </div>
+          )}
         </>
       )}
 
