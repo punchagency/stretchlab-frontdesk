@@ -104,38 +104,46 @@ const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-white border border-neutral-tertiary p-4 rounded-2xl shadow-xl text-xs space-y-2.5 min-w-[250px] z-50">
+      <div className="bg-white border border-neutral-tertiary p-4 rounded-2xl shadow-xl text-xs space-y-2.5 min-w-[270px] z-50">
         <p className="font-extrabold text-dark-1 text-sm border-b border-neutral-tertiary/60 pb-2 flex items-center gap-1.5">
           <MapPin className="w-4 h-4 text-primary-base" />
           {data.location_name}
         </p>
         <div className="space-y-1.5 text-grey-5">
-          <div className="flex justify-between items-center py-0.5">
-            <span className="font-semibold text-grey-5">Matched Conversion:</span>
+          <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
+            <span className="font-semibold text-grey-5">Intake Submission Rate:</span>
             <span className="font-black text-primary-base text-xs">
-              {data.matched_conversion_percentage}%
+              {data.intake_form_submission_rate}%
             </span>
           </div>
-          <div className="flex justify-between items-center py-0.5">
-            <span className="font-semibold text-grey-5">Raw Conversion:</span>
-            <span className="font-black text-blue-600 text-xs">
-              {data.conversion_percentage}%
+          <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
+            <span className="font-semibold text-emerald-700">Conversion (With Intake):</span>
+            <span className="font-black text-emerald-600 text-xs">
+              {data.conversion_rate_with_intake_form}%
             </span>
           </div>
-          <div className="flex justify-between items-center py-0.5">
-            <span className="font-semibold text-grey-5">First Visits:</span>
-            <span className="font-bold text-dark-1">{data.first_visits}</span>
+          <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
+            <span className="font-semibold text-amber-700">Conversion (No Intake):</span>
+            <span className="font-black text-amber-600 text-xs">
+              {data.conversion_rate_without_intake_form}%
+            </span>
           </div>
-          <div className="flex justify-between items-center py-0.5">
-            <span className="font-semibold text-grey-5">Form First Visits:</span>
+          <div className="flex justify-between items-center py-0.5 text-[11px] text-grey-5">
+            <span>Conversions (With / Without Intake):</span>
             <span className="font-bold text-dark-1">
-              {data.first_visits_from_intake_form}
+              {data.first_visit_conversions_with_intake_form} / {data.first_visit_conversions_without_intake_form}
             </span>
           </div>
-          <div className="flex justify-between items-center py-0.5">
-            <span className="font-semibold text-grey-5">Total Submissions:</span>
+          <div className="flex justify-between items-center py-0.5 text-[11px] text-grey-5">
+            <span>Visits (With / Without Intake):</span>
             <span className="font-bold text-dark-1">
-              {data.intake_form_submissions}
+              {data.first_visits_with_intake_form} / {data.first_visits_without_intake_form}
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-0.5 text-[11px] text-grey-5">
+            <span>Total Visits / Submissions:</span>
+            <span className="font-bold text-dark-1">
+              {data.first_visits} / {data.intake_form_submissions}
             </span>
           </div>
         </div>
@@ -203,12 +211,16 @@ export const IntakeConversion = () => {
     .map((loc: IntakeFormLocation) => ({
       name: loc.location_name,
       location_name: loc.location_name,
-      matched_conversion_percentage: loc.matched_conversion_percentage,
-      conversion_percentage: loc.conversion_percentage,
+      intake_form_submission_rate: loc.intake_form_submission_rate ?? loc.conversion_percentage ?? 0,
+      conversion_rate_with_intake_form: loc.conversion_rate_with_intake_form ?? loc.matched_conversion_percentage ?? 0,
+      conversion_rate_without_intake_form: loc.conversion_rate_without_intake_form ?? 0,
+      first_visits_with_intake_form: loc.first_visits_with_intake_form ?? loc.first_visits_from_intake_form ?? 0,
+      first_visit_conversions_with_intake_form: loc.first_visit_conversions_with_intake_form ?? 0,
+      first_visits_without_intake_form: loc.first_visits_without_intake_form ?? 0,
+      first_visit_conversions_without_intake_form: loc.first_visit_conversions_without_intake_form ?? 0,
       first_visits: loc.first_visits,
-      first_visits_from_intake_form: loc.first_visits_from_intake_form,
       intake_form_submissions: loc.intake_form_submissions,
-      value: loc.matched_conversion_percentage,
+      value: loc.conversion_rate_with_intake_form ?? loc.matched_conversion_percentage ?? 0,
     }));
 
   return (
@@ -216,10 +228,16 @@ export const IntakeConversion = () => {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-neutral-tertiary shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[10px] font-black uppercase tracking-widest text-primary-base bg-primary-base/10 px-2.5 py-1 rounded-full border border-primary-base/20 flex items-center gap-1">
               <Sparkles className="w-3 h-3" /> Analytics & Performance
             </span>
+            {(conversionData?.matched_by_client_id !== undefined || conversionData?.matched_by_name !== undefined) && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-grey-5 bg-neutral-quaternary px-2.5 py-1 rounded-full border border-neutral-tertiary flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-base"></span>
+                {conversionData.matched_by_client_id ?? 0} ID Matches · {conversionData.matched_by_name ?? 0} Name Matches
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
             Form Conversion Rate
@@ -297,32 +315,37 @@ export const IntakeConversion = () => {
         <div className="space-y-6">
           {/* Metrics Rollup Row */}
           <TooltipProvider delayDuration={200}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {/* Card 1: Matched Conversion Percentage */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {/* Card 1: Intake Submission Rate */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-primary-base/40 transition-all flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary-base">
-                          Matched Conversion %
+                          Intake Submission Rate
                         </span>
                         <div className="w-8 h-8 rounded-xl bg-primary-base/10 text-primary-base border border-primary-base/20 flex items-center justify-center shrink-0">
-                          <CheckCircle2 className="w-4 h-4" />
+                          <TrendingUp className="w-4 h-4" />
                         </div>
                       </div>
                       <h3 className="text-2xl font-black text-dark-1 mb-1">
-                        {conversionData?.matched_conversion_percentage !== undefined
-                          ? `${conversionData.matched_conversion_percentage}%`
-                          : "0%"}
+                        {conversionData?.intake_form_submission_rate !== undefined
+                          ? `${conversionData.intake_form_submission_rate}%`
+                          : conversionData?.conversion_percentage !== undefined
+                            ? `${conversionData.conversion_percentage}%`
+                            : "0%"}
                       </h3>
+                      <p className="text-[10px] text-grey-5 font-medium">
+                        Submissions / First Visits
+                      </p>
                     </div>
                     <div className="mt-3 w-full bg-neutral-quaternary rounded-full h-1.5 overflow-hidden">
                       <div
                         className="bg-primary-base h-1.5 rounded-full transition-all duration-500"
                         style={{
                           width: `${Math.min(
-                            conversionData?.matched_conversion_percentage || 0,
+                            conversionData?.intake_form_submission_rate ?? conversionData?.conversion_percentage ?? 0,
                             100
                           )}%`,
                         }}
@@ -331,91 +354,114 @@ export const IntakeConversion = () => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[220px] text-xs">
-                  Percentage of completed 1st visits that were successfully matched to a submitted intake form.
+                  Count of Intake Form Submissions / Count of First Visits.
                 </TooltipContent>
               </Tooltip>
 
-              {/* Card 2: Conversion Percentage */}
-              {/* <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-blue-300 transition-all flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">
-                          Raw Conversion %
-                        </span>
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                          <BarChart2 className="w-4 h-4" />
-                        </div>
-                      </div>
-                      <h3 className="text-2xl font-black text-dark-1 mb-1">
-                        {conversionData?.conversion_percentage !== undefined
-                          ? `${conversionData.conversion_percentage}%`
-                          : "0%"}
-                      </h3>
-                    </div>
-                    <div className="mt-3 w-full bg-blue-50 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.min(
-                            conversionData?.conversion_percentage || 0,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-[220px] text-xs">
-                  Raw percentage calculated by dividing total intake form submissions by completed 1st visits.
-                </TooltipContent>
-              </Tooltip> */}
-
-              {/* Card 3: First Visits From Intake Form */}
+              {/* Card 2: Conversion Rate WITH Intake Form */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-emerald-300 transition-all flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600">
-                          Form 1st Visits
+                          Conversion Rate (With Intake)
                         </span>
                         <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
                       </div>
-                      <h3 className="text-2xl font-black text-dark-1">
-                        {conversionData?.first_visits_from_intake_form ?? 0}
+                      <h3 className="text-2xl font-black text-dark-1 mb-1">
+                        {conversionData?.conversion_rate_with_intake_form !== undefined
+                          ? `${conversionData.conversion_rate_with_intake_form}%`
+                          : `${conversionData?.matched_conversion_percentage ?? 0}%`}
                       </h3>
+                      <p className="text-[10px] text-grey-5 font-medium truncate">
+                        {conversionData?.first_visit_conversions_with_intake_form ?? 0} converted / {conversionData?.first_visits_with_intake_form ?? conversionData?.first_visits_from_intake_form ?? 0} visits
+                      </p>
                     </div>
-
+                    <div className="mt-3 w-full bg-emerald-50 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-600 h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(
+                            conversionData?.conversion_rate_with_intake_form ?? conversionData?.matched_conversion_percentage ?? 0,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-[220px] text-xs">
-                  Total 1st visit bookings matched to a submitted digital intake form.
+                <TooltipContent className="max-w-[260px] text-xs space-y-1">
+                  <p>Count of First Visit Conversions with Intake Form / Count of First Visits with Intake Form Submitted.</p>
+                  {(conversionData?.matched_by_client_id !== undefined || conversionData?.matched_by_name !== undefined) && (
+                    <p className="text-[11px] text-primary-base pt-1 border-t border-neutral-tertiary/60 font-semibold">
+                      {conversionData.matched_by_client_id ?? 0} ID matches, {conversionData.matched_by_name ?? 0} name matches.
+                    </p>
+                  )}
                 </TooltipContent>
               </Tooltip>
 
-              {/* Card 4: First Visits */}
+              {/* Card 3: Conversion Rate WITHOUT Intake Form */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-purple-300 transition-all flex flex-col justify-between">
+                  <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-amber-300 transition-all flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600">
-                          First Visits
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600">
+                          Conversion Rate (No Intake)
                         </span>
-                        <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
                           <Users className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <h3 className="text-2xl font-black text-dark-1 mb-1">
+                        {conversionData?.conversion_rate_without_intake_form !== undefined
+                          ? `${conversionData.conversion_rate_without_intake_form}%`
+                          : "0%"}
+                      </h3>
+                      <p className="text-[10px] text-grey-5 font-medium truncate">
+                        {conversionData?.first_visit_conversions_without_intake_form ?? 0} converted / {conversionData?.first_visits_without_intake_form ?? 0} visits
+                      </p>
+                    </div>
+                    <div className="mt-3 w-full bg-amber-50 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-amber-600 h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(
+                            conversionData?.conversion_rate_without_intake_form ?? 0,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[240px] text-xs">
+                  Count of First Visit Conversions without Intake Form / Count of First Visits without Intake Form Submitted.
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Card 4: Total First Visits */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-primary-base/30 transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-grey-5">
+                          Total First Visits
+                        </span>
+                        <div className="w-8 h-8 rounded-xl bg-neutral-quaternary text-dark-1 border border-neutral-tertiary flex items-center justify-center shrink-0">
+                          <Users className="w-4 h-4 text-grey-5" />
                         </div>
                       </div>
                       <h3 className="text-2xl font-black text-dark-1">
                         {conversionData?.first_visits ?? 0}
                       </h3>
                     </div>
-                    <p className="text-[10px] text-grey-2 font-mono mt-3">
-                      Logged complete
+                    <p className="text-[10px] text-grey-5 mt-2 font-medium">
+                      1st visits logged complete
                     </p>
                   </div>
                 </TooltipTrigger>
@@ -427,21 +473,21 @@ export const IntakeConversion = () => {
               {/* Card 5: Form Submissions */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-amber-300 transition-all flex flex-col justify-between">
+                  <div className="bg-white p-5 rounded-2xl border border-neutral-tertiary shadow-xs cursor-help hover:border-primary-base/30 transition-all flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600">
-                          Submissions
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-grey-5">
+                          Intake Submissions
                         </span>
-                        <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
-                          <FileText className="w-4 h-4" />
+                        <div className="w-8 h-8 rounded-xl bg-neutral-quaternary text-dark-1 border border-neutral-tertiary flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-primary-base" />
                         </div>
                       </div>
                       <h3 className="text-2xl font-black text-dark-1">
                         {conversionData?.intake_form_submissions ?? 0}
                       </h3>
                     </div>
-                    <p className="text-[10px] text-grey-2 font-mono mt-3">
+                    <p className="text-[10px] text-grey-5 mt-2 font-medium">
                       Total forms submitted
                     </p>
                   </div>
