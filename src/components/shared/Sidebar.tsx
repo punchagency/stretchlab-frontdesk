@@ -110,13 +110,13 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       {(canAccessAdmin || canAccessNoteApp) && (
         <div className="px-4 py-3 border-t border-neutral-tertiary/60 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-wider text-grey-5 px-1">
-            Switch Application
+            Switch Views
           </p>
 
           <div className="flex flex-col gap-1">
             {/* Current App: Front Desk */}
             <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-primary-base/10 text-primary-base font-bold text-xs border border-primary-base/20">
-              <span>Front Desk Portal</span>
+              <span>Front Desk</span>
               <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary-base text-white">
                 Active
               </span>
@@ -128,7 +128,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 onClick={() => window.open(adminURL, "_self")}
                 className="flex items-center justify-between px-3 py-2 rounded-xl text-dark-1 hover:bg-neutral-quaternary font-semibold text-xs transition-colors cursor-pointer w-full text-left"
               >
-                <span>Admin Portal</span>
+                <span>Manager</span>
                 <ExternalLink className="w-3.5 h-3.5 text-grey-2" />
               </button>
             )}
@@ -139,7 +139,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 onClick={() => window.open(noteAppURL, "_self")}
                 className="flex items-center justify-between px-3 py-2 rounded-xl text-dark-1 hover:bg-neutral-quaternary font-semibold text-xs transition-colors cursor-pointer w-full text-left"
               >
-                <span>Note Taking App</span>
+                <span>Note Taking</span>
                 <ExternalLink className="w-3.5 h-3.5 text-grey-2" />
               </button>
             )}
