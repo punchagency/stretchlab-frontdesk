@@ -14,7 +14,7 @@ const noteAppURL = import.meta.env.VITE_REDIRECT_URL || "https://stretchnote.com
 
 const menuItems = [
   {
-    title: "Intake Submissions",
+    title: "Form Intake Submissions",
     path: "/",
     icon: Home,
   },
@@ -35,7 +35,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const navigate = useNavigate();
   const userInfo = getUserInfo();
 
-  const canAccessAdmin = hasRole(userInfo, [4]);
+  const canAccessAdmin = hasRole(userInfo, [1, 2, 4]);
   const canAccessNoteApp = hasRole(userInfo, [3]);
 
   const handleLogout = async () => {
@@ -122,13 +122,13 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               </span>
             </div>
 
-            {/* Switch to Admin */}
+            {/* Switch to Admin / Manager */}
             {canAccessAdmin && (
               <button
                 onClick={() => window.open(adminURL, "_self")}
                 className="flex items-center justify-between px-3 py-2 rounded-xl text-dark-1 hover:bg-neutral-quaternary font-semibold text-xs transition-colors cursor-pointer w-full text-left"
               >
-                <span>Manager</span>
+                <span>{hasRole(userInfo, [1, 2]) ? "Admin" : "Manager"}</span>
                 <ExternalLink className="w-3.5 h-3.5 text-grey-2" />
               </button>
             )}

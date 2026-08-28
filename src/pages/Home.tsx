@@ -29,7 +29,6 @@ export const Home = () => {
   const [endDate, setEndDate] = useState<string>("");
   const [search, setSearch] = useState<string>("");
 
-  // Selected Submission Detail Drawer Modal State
   const [selectedSubmission, setSelectedSubmission] =
     useState<IntakeSubmission | null>(null);
 
@@ -37,7 +36,6 @@ export const Home = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // TanStack Query for Frontdesk Home Submissions
   const homeQueryParams = {
     page,
     page_size: pageSize,
@@ -195,7 +193,6 @@ export const Home = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
-      {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-neutral-tertiary shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
