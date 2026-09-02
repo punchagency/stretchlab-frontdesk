@@ -19,6 +19,7 @@ interface DataTableProps<TData> {
   isLoading?: boolean;
   onRowClick?: (row: TData) => void;
   rowClassName?: string | ((row: TData) => string);
+  rowId?: (row: TData) => string;
   pagination?: {
     pageIndex: number;
     pageSize: number;
@@ -38,6 +39,7 @@ export function DataTable<TData>({
   isLoading = false,
   onRowClick,
   rowClassName,
+  rowId,
   pagination,
   enableSearch = false,
   searchPlaceholder,
@@ -212,6 +214,7 @@ export function DataTable<TData>({
             return (
               <tr
                 key={row.id}
+                id={rowId ? rowId(row.original) : undefined}
                 onClick={() => onRowClick && onRowClick(row.original)}
                 className={`hover:bg-neutral-quaternary/40 transition-colors ${onRowClick ? "cursor-pointer" : ""
                   } ${calculatedRowClass}`}
