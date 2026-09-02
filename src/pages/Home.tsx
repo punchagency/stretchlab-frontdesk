@@ -750,12 +750,7 @@ export const Home = () => {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-2 text-amber-700 text-xs font-bold">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Unmatched Submission — No first-time visit appointment scraped for this submission.</span>
-                  </div>
-                )}
+                ) : null}
 
                 {/* General Submission Attributes */}
                 <div className="grid grid-cols-2 gap-3">
