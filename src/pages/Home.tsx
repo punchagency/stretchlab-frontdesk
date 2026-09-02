@@ -332,7 +332,7 @@ export const Home = () => {
             {isMatched ? (
               <>
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                <span>✓ Matched to Visit</span>
+                <span>✓ Matched to First Visit</span>
               </>
             ) : (
               <>
