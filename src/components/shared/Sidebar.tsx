@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { MapPin, Target, MessageSquare, LogOut, X, ExternalLink } from "lucide-react";
+import { MapPin, LogOut, X, ExternalLink } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -18,16 +18,16 @@ const menuItems = [
     path: "/",
     icon: MapPin,
   },
-  {
-    title: "Goals",
-    path: "/goals",
-    icon: Target,
-  },
-  {
-    title: "Reviews",
-    path: "/reviews",
-    icon: MessageSquare,
-  },
+  // {
+  //   title: "Goals",
+  //   path: "/goals",
+  //   icon: Target,
+  // },
+  // {
+  //   title: "Reviews",
+  //   path: "/reviews",
+  //   icon: MessageSquare,
+  // },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
