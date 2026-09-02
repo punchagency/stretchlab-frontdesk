@@ -8,16 +8,38 @@ export interface FrontdeskHomeParams {
   end_date?: string;
 }
 
+export interface FirstTimerRecord {
+  id: number;
+  config_id: number;
+  client_name?: string;
+  customer_id?: string;
+  location?: string;
+  location_id?: string;
+  flexologist_name?: string;
+  booking_id?: string;
+  status?: string;
+  appointment_date?: string;
+  matched: boolean;
+  matched_on?: string | null;
+  days_before_appointment?: number | null;
+  submission?: IntakeSubmission | null;
+}
+
 export interface IntakeSubmission {
   id: number;
-  form_id: number;
+  form_id: string | number;
   location_id: string;
   location_name?: string;
   client_name?: string;
-  submitter_id?: number;
+  client_id?: string | number;
+  submitter_id?: string | number;
   submitted_at: string;
   updated_at?: string;
   task_status?: string;
+  matched: boolean;
+  matched_on?: string | null;
+  days_before_appointment?: number | null;
+  first_timer?: FirstTimerRecord | null;
 }
 
 export interface StudioLocation {
@@ -30,10 +52,12 @@ export interface FrontdeskHomeResponse {
   status: string;
   data: {
     admin_id: number;
+    config_ids: number[];
     locations: StudioLocation[];
-    intake_form_ids: number[];
+    intake_form_ids: string[] | number[];
+    first_timers: FirstTimerRecord[];
     submissions: IntakeSubmission[];
-    pagination: {
+    pagination?: {
       page: number;
       page_size: number;
       total: number;

@@ -2,9 +2,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
 import "./index.css";
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, IntakeConversion, ReviewInbox } from "./pages";
+import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage } from "./pages";
 import { AppLayout } from "./components/shared";
 
 const queryClient = new QueryClient({
@@ -28,13 +28,26 @@ const router = createBrowserRouter([
     errorElement: <ErrorPage />,
   },
   {
-    path: "/intake-conversion",
+    path: "/goals",
     element: (
       <AppLayout>
-        <IntakeConversion />
+        <GoalsPage />
       </AppLayout>
     ),
     errorElement: <ErrorPage />,
+  },
+  {
+    path: "/reviews",
+    element: (
+      <AppLayout>
+        <ReviewsPage />
+      </AppLayout>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/intake-conversion",
+    element: <Navigate to="/?tab=performance" replace />,
   },
   {
     path: "/review-inbox",

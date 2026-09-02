@@ -153,7 +153,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export const IntakeConversion = () => {
+export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean }) => {
   const token = getUserCookie();
 
   const [duration, setDuration] = useState("this_month");
@@ -224,40 +224,42 @@ export const IntakeConversion = () => {
     }));
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <div className={hideHeader ? "space-y-6" : "p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6"}>
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-neutral-tertiary shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-[10px] font-black uppercase tracking-widest text-primary-base bg-primary-base/10 px-2.5 py-1 rounded-full border border-primary-base/20 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Analytics & Performance
-            </span>
-            {(conversionData?.matched_by_client_id !== undefined || conversionData?.matched_by_name !== undefined) && (
-              <span className="text-[10px] font-bold uppercase tracking-wider text-grey-5 bg-neutral-quaternary px-2.5 py-1 rounded-full border border-neutral-tertiary flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary-base"></span>
-                {conversionData.matched_by_client_id ?? 0} ID Matches · {conversionData.matched_by_name ?? 0} Name Matches
+      {!hideHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-neutral-tertiary shadow-xs">
+          <div>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-widest text-primary-base bg-primary-base/10 px-2.5 py-1 rounded-full border border-primary-base/20 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Analytics &amp; Performance
               </span>
-            )}
+              {(conversionData?.matched_by_client_id !== undefined || conversionData?.matched_by_name !== undefined) && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-grey-5 bg-neutral-quaternary px-2.5 py-1 rounded-full border border-neutral-tertiary flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary-base"></span>
+                  {conversionData.matched_by_client_id ?? 0} ID Matches · {conversionData.matched_by_name ?? 0} Name Matches
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
+              Form Conversion Rate
+            </h1>
+            <p className="text-grey-5 text-xs sm:text-sm mt-1">
+              Live overview of digital intake form completion rate measured against completed 1st visits.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
-            Form Conversion Rate
-          </h1>
-          <p className="text-grey-5 text-xs sm:text-sm mt-1">
-            Live overview of digital intake form completion rate measured against completed 1st visits.
-          </p>
-        </div>
 
-        <button
-          onClick={() => refetch()}
-          disabled={isRefetching || isFetching}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-quaternary hover:bg-neutral-tertiary text-grey-5 font-bold rounded-xl text-xs transition-all cursor-pointer border border-neutral-tertiary active:scale-95 disabled:opacity-50 shrink-0 self-start sm:self-auto"
-        >
-          <RotateCcw
-            className={`w-4 h-4 ${isRefetching || isFetching ? "animate-spin text-primary-base" : ""}`}
-          />
-          {isRefetching || isFetching ? "Refreshing..." : "Refresh Data"}
-        </button>
-      </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isRefetching || isFetching}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-quaternary hover:bg-neutral-tertiary text-grey-5 font-bold rounded-xl text-xs transition-all cursor-pointer border border-neutral-tertiary active:scale-95 disabled:opacity-50 shrink-0 self-start sm:self-auto"
+          >
+            <RotateCcw
+              className={`w-4 h-4 ${isRefetching || isFetching ? "animate-spin text-primary-base" : ""}`}
+            />
+            {isRefetching || isFetching ? "Refreshing..." : "Refresh Data"}
+          </button>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-neutral-tertiary shadow-xs flex flex-wrap items-center justify-between gap-4">

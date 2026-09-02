@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { Home, TrendingUp, LogOut, X, ExternalLink } from "lucide-react";
+import { MapPin, Target, MessageSquare, LogOut, X, ExternalLink } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -14,20 +14,20 @@ const noteAppURL = import.meta.env.VITE_REDIRECT_URL || "https://stretchnote.com
 
 const menuItems = [
   {
-    title: "Form Intake Submissions",
+    title: "First Visits",
     path: "/",
-    icon: Home,
+    icon: MapPin,
   },
   {
-    title: "Form Conversion Rate",
-    path: "/intake-conversion",
-    icon: TrendingUp,
+    title: "Goals",
+    path: "/goals",
+    icon: Target,
   },
-  // {
-  //   title: "SMS Review Inbox",
-  //   path: "/review-inbox",
-  //   icon: MessageSquare,
-  // },
+  {
+    title: "Reviews",
+    path: "/reviews",
+    icon: MessageSquare,
+  },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
