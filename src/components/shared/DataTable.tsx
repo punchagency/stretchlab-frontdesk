@@ -59,7 +59,7 @@ export function DataTable<TData>({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     pageCount: pagination?.pageCount,
-    manualPagination: !!pagination,
+    manualPagination: true,
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: (row, _columnId, filterValue: any) => {
       const val = String(filterValue || "").toLowerCase().trim();
