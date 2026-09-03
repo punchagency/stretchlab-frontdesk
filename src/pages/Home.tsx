@@ -22,7 +22,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Users,
-  ArrowRight,
 } from "lucide-react";
 import { DataTable, ErrorHandle } from "../components/shared";
 import { IntakeConversion } from "./IntakeConversion";
@@ -61,9 +60,6 @@ export const Home = () => {
 
   const [selectedSubmission, setSelectedSubmission] =
     useState<IntakeSubmission | null>(null);
-
-  const [highlightedFirstTimerId, setHighlightedFirstTimerId] = useState<number | null>(null);
-  const [highlightedSubmissionId, setHighlightedSubmissionId] = useState<number | null>(null);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -257,23 +253,13 @@ export const Home = () => {
       cell: ({ row }: any) => {
         const ft: FirstTimerRecord = row.original;
         const sub = ft.submission;
-        const targetSubmission =
-          (sub && submissions.find((s) => s.id === sub.id)) ||
-          submissions.find(
-            (s) =>
-              s.first_timer?.id === ft.id ||
-              (s.submitter_id &&
-                (String(s.submitter_id) === String(ft.clubready_user_id) ||
-                  String(s.submitter_id) === String(ft.customer_id)))
-          );
-        const isMatched = ft.matched || Boolean(sub) || Boolean(targetSubmission);
+        const isMatched = ft.matched || (sub !== null && sub !== undefined);
         return (
           <span
-            className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
-              isMatched
+            className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${isMatched
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                 : "bg-amber-50 text-amber-700 border-amber-200"
-            }`}
+              }`}
           >
             {isMatched ? (
               <>
@@ -295,46 +281,16 @@ export const Home = () => {
       cell: ({ row }: any) => {
         const ft: FirstTimerRecord = row.original;
         const sub = ft.submission;
-        const targetSubmission =
-          (sub && submissions.find((s) => s.id === sub.id)) ||
-          submissions.find(
-            (s) =>
-              s.first_timer?.id === ft.id ||
-              (s.submitter_id &&
-                (String(s.submitter_id) === String(ft.clubready_user_id) ||
-                  String(s.submitter_id) === String(ft.customer_id)))
-          );
-
-        if (targetSubmission) {
-          return (
-            <button
-              onClick={() => {
-                setSubView("submissions");
-                setHighlightedSubmissionId(targetSubmission.id);
-                setHighlightedFirstTimerId(null);
-                setTimeout(() => {
-                  const el = document.getElementById(`submission-row-${targetSubmission.id}`);
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                  } else {
-                    setSelectedSubmission(targetSubmission);
-                  }
-                }, 150);
-              }}
-              className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-extrabold rounded-xl text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-              title="Highlight matching Intake Submission in Submissions table"
-            >
-              <span>See Match</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          );
-        }
-
-        if (sub || ft.matched) {
-          return <span className="text-xs text-amber-700 font-mono font-bold">No Match</span>;
-        }
-
-        return <span className="text-xs text-grey-2 font-mono">No Submission</span>;
+        return sub ? (
+          <button
+            onClick={() => setSelectedSubmission(sub)}
+            className="px-3 py-1.5 bg-primary-base/10 text-primary-base hover:bg-primary-base/20 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+          >
+            View Details
+          </button>
+        ) : (
+          <span className="text-xs text-grey-2 font-mono">No Submission</span>
+        );
       },
     },
   ];
@@ -716,8 +672,8 @@ export const Home = () => {
                 enableSorting={true}
                 rowId={(row: FirstTimerRecord) => `first-timer-row-${row.id}`}
                 rowClassName={(row: FirstTimerRecord) =>
-                  row.id === highlightedFirstTimerId
-                    ? "!bg-emerald-50/60 border-l-4 border-l-emerald-500 font-semibold transition-all duration-300"
+                  row.submission
+                    ? "bg-emerald-50/60 border-l-4 border-primary font-semibold transition-all duration-300"
                     : ""
                 }
                 pagination={{
@@ -737,11 +693,7 @@ export const Home = () => {
                 isLoading={isLoading}
                 enableSorting={true}
                 rowId={(row: IntakeSubmission) => `submission-row-${row.id}`}
-                rowClassName={(row: IntakeSubmission) =>
-                  row.id === highlightedSubmissionId
-                    ? "bg-emerald-50/60 border-l-4 border-primary font-semibold transition-all duration-300"
-                    : ""
-                }
+
                 pagination={{
                   pageIndex: page - 1,
                   pageSize: pageSize,
