@@ -16,6 +16,7 @@ import {
   Search,
   RotateCcw,
   User,
+  // Phone,
   X,
   TrendingUp,
   CheckCircle2,
@@ -112,9 +113,12 @@ export const Home = () => {
     const query = search.toLowerCase().trim();
     return (
       (ft.client_name || "").toLowerCase().includes(query) ||
-      (ft.location || "").toLowerCase().includes(query) ||
-      (ft.flexologist_name || "").toLowerCase().includes(query) ||
-      String(ft.customer_id || "").includes(query) ||
+      (ft.location_name || ft.location || "").toLowerCase().includes(query) ||
+      (ft.instructor || ft.flexologist_name || "").toLowerCase().includes(query) ||
+      (ft.booking_name || "").toLowerCase().includes(query) ||
+      (ft.email || "").toLowerCase().includes(query) ||
+      (ft.cellphone || "").toLowerCase().includes(query) ||
+      String(ft.clubready_user_id || ft.customer_id || "").includes(query) ||
       String(ft.id).includes(query)
     );
   });
@@ -147,11 +151,39 @@ export const Home = () => {
     }
   };
 
+  const formatApptDate = (ft?: FirstTimerRecord | null) => {
+    if (!ft) return "N/A";
+    if (ft.booking_date) {
+      try {
+        const dateParts = ft.booking_date.split("-");
+        if (dateParts.length === 3) {
+          const year = parseInt(dateParts[0], 10);
+          const monthIndex = parseInt(dateParts[1], 10) - 1;
+          const day = parseInt(dateParts[2], 10);
+          const monthNames = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+          ];
+          const formattedDateStr = `${monthNames[monthIndex]} ${day}, ${year}`;
+          if (ft.booking_time) {
+            return `${formattedDateStr}, ${ft.booking_time}`;
+          }
+          return formattedDateStr;
+        }
+      } catch (e) {
+        console.error("Error formatting booking_date:", e);
+      }
+      return ft.booking_time ? `${ft.booking_date}, ${ft.booking_time}` : ft.booking_date;
+    }
+    return formatDate(ft.appointment_date);
+  };
+
   const firstTimersColumns = [
     {
       header: "Client Name",
       cell: ({ row }: any) => {
         const ft: FirstTimerRecord = row.original;
+        const userId = ft.clubready_user_id || ft.customer_id || ft.id;
         return (
           <div className="flex items-center gap-3 py-1">
             <div className="w-8 h-8 rounded-full bg-primary-base/10 text-primary-base font-bold flex items-center justify-center shrink-0">
@@ -162,10 +194,24 @@ export const Home = () => {
                 {ft.client_name || "Unknown Client"}
               </p>
               <p className="text-[10px] text-grey-2 font-mono">
-                ID #{ft.customer_id || ft.id}
+                ID #{userId}
+                {ft.email ? ` • ${ft.email}` : ""}
               </p>
             </div>
           </div>
+        );
+      },
+    },
+    {
+      header: "Phone Number",
+      cell: ({ row }: any) => {
+        const ft: FirstTimerRecord = row.original;
+        const phone = ft.cellphone;
+        return (
+          <span className="text-grey-5 font-mono text-[11px] inline-flex items-center gap-1">
+            {/* <Phone className="w-3 h-3 text-grey-2 shrink-0" /> */}
+            {phone || "N/A"}
+          </span>
         );
       },
     },
@@ -174,9 +220,12 @@ export const Home = () => {
       cell: ({ row }: any) => {
         const ft: FirstTimerRecord = row.original;
         return (
-          <span className="text-grey-5 font-mono text-[11px]">
-            {formatDate(ft.appointment_date)}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-grey-5 font-mono text-[11px] font-semibold">
+              {formatApptDate(ft)}
+            </span>
+
+          </div>
         );
       },
     },
@@ -187,7 +236,7 @@ export const Home = () => {
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-dark-1 bg-neutral-quaternary px-2.5 py-1 rounded-lg border border-neutral-tertiary">
             <MapPin className="w-3 h-3 text-grey-2" />
-            {ft.location || `Location #${ft.location_id}`}
+            {ft.location_name || ft.location || `Location #${ft.location_id}`}
           </span>
         );
       },
@@ -198,7 +247,7 @@ export const Home = () => {
         const ft: FirstTimerRecord = row.original;
         return (
           <span className="text-xs font-semibold text-dark-1 capitalize">
-            {ft.flexologist_name || "N/A"}
+            {ft.instructor || ft.flexologist_name || "N/A"}
           </span>
         );
       },
@@ -651,7 +700,7 @@ export const Home = () => {
                 rowId={(row: IntakeSubmission) => `submission-row-${row.id}`}
                 rowClassName={(row: IntakeSubmission) =>
                   row.id === highlightedSubmissionId
-                    ? "!bg-emerald-50/60 border-l-4 border-l-emerald-500 font-semibold transition-all duration-300"
+                    ? "bg-emerald-50/60 border-l-4 border-primary font-semibold transition-all duration-300"
                     : ""
                 }
                 pagination={{
@@ -681,7 +730,7 @@ export const Home = () => {
                   </div>
                   <div>
                     <h3 className="font-black text-dark-1 text-base">
-                      Intake Submission &amp; Match Inspection
+                      Intake Submission Details
                     </h3>
                     <p className="text-xs text-grey-5 font-mono">
                       Submission #{selectedSubmission.id}
@@ -706,7 +755,7 @@ export const Home = () => {
                         Verified Match Pair
                       </span>
                       <span className="text-[10px] font-bold bg-white text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono">
-                        Matched by Client ID #{selectedSubmission.submitter_id || selectedSubmission.first_timer.customer_id}
+                        Matched by Client ID #{selectedSubmission.submitter_id || selectedSubmission.first_timer.clubready_user_id || selectedSubmission.first_timer.customer_id}
                       </span>
                     </div>
 
@@ -720,13 +769,13 @@ export const Home = () => {
                           {selectedSubmission.first_timer.client_name || "N/A"}
                         </p>
                         <p className="text-[11px] text-grey-5 font-mono">
-                          Member ID #{selectedSubmission.first_timer.customer_id}
+                          Member ID #{selectedSubmission.first_timer.clubready_user_id || selectedSubmission.first_timer.customer_id || selectedSubmission.first_timer.id}
                         </p>
                         <p className="text-[11px] text-grey-5 font-mono">
-                          Appt: {formatDate(selectedSubmission.first_timer.appointment_date)}
+                          Appt: {formatApptDate(selectedSubmission.first_timer)}
                         </p>
                         <p className="text-[11px] text-grey-5">
-                          Flexologist: {selectedSubmission.first_timer.flexologist_name || "N/A"}
+                          Flexologist: {selectedSubmission.first_timer.instructor || selectedSubmission.first_timer.flexologist_name || "N/A"}
                         </p>
                       </div>
 

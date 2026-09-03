@@ -10,17 +10,25 @@ export interface FrontdeskHomeParams {
 
 export interface FirstTimerRecord {
   id: number;
-  config_id: number;
+  config_id?: number;
   client_name?: string;
+  clubready_user_id?: string;
   customer_id?: string;
+  location_name?: string;
   location?: string;
   location_id?: string;
+  instructor?: string;
   flexologist_name?: string;
-  booking_id?: string;
-  status?: string;
+  booking_date?: string;
+  booking_time?: string;
+  booking_name?: string;
   appointment_date?: string;
+  cellphone?: string;
+  email?: string;
+  status?: string;
   matched: boolean;
   matched_on?: string | null;
+  days_before_visit?: number | null;
   days_before_appointment?: number | null;
   submission?: IntakeSubmission | null;
 }
@@ -36,8 +44,9 @@ export interface IntakeSubmission {
   submitted_at: string;
   updated_at?: string;
   task_status?: string;
-  matched: boolean;
+  matched?: boolean;
   matched_on?: string | null;
+  days_before_visit?: number | null;
   days_before_appointment?: number | null;
   first_timer?: FirstTimerRecord | null;
 }

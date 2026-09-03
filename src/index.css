@@ -20,3 +20,7 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.border-primary {
+  border-left-color: #378d9a !important;
+}
