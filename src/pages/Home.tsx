@@ -257,8 +257,8 @@ export const Home = () => {
         return (
           <span
             className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${isMatched
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : "bg-amber-50 text-amber-700 border-amber-200"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-amber-50 text-amber-700 border-amber-200"
               }`}
           >
             {isMatched ? (
@@ -549,7 +549,7 @@ export const Home = () => {
                   }`}
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>First-Time Visit Bookings ({firstTimers.length})</span>
+                <span>First Visits ({firstTimers.length})</span>
               </button>
 
               <button
