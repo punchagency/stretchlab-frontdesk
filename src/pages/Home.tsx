@@ -870,7 +870,7 @@ export const Home = () => {
                 </div>
               </div>
 
-              <div className="p-4 bg-neutral-quaternary/40 border-t border-neutral-tertiary flex items-center justify-between gap-3">
+              <div className="p-4 bg-neutral-quaternary/40 border-t border-neutral-tertiary flex items-end justify-end gap-3 ">
                 {/* <button
                   onClick={() => setEmailSubmissionId(selectedSubmission.id)}
                   className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
