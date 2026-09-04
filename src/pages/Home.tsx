@@ -871,13 +871,13 @@ export const Home = () => {
               </div>
 
               <div className="p-4 bg-neutral-quaternary/40 border-t border-neutral-tertiary flex items-center justify-between gap-3">
-                <button
+                {/* <button
                   onClick={() => setEmailSubmissionId(selectedSubmission.id)}
                   className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
                 >
                   <Mail className="w-4 h-4 text-blue-600" />
                   <span>Email to Studio Team</span>
-                </button>
+                </button> */}
                 <button
                   onClick={() => setSelectedSubmission(null)}
                   className="px-5 py-2 bg-primary-base hover:bg-opacity-95 text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer"
