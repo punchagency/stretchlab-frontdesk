@@ -10,3 +10,5 @@ export * from "./Sidebar";
 export * from "./AppLayout";
 export * from "./DateRangeFilter";
 export * from "./FilterDropdown";
+export * from "./IntakeEmailModal";
+

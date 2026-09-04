@@ -22,9 +22,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Users,
+  Mail,
+  Eye,
 } from "lucide-react";
-import { DataTable, ErrorHandle } from "../components/shared";
+
+import { DataTable, ErrorHandle, IntakeEmailModal } from "../components/shared";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import { IntakeConversion } from "./IntakeConversion";
+
 
 export const Home = () => {
   const token = getUserCookie();
@@ -60,6 +65,7 @@ export const Home = () => {
 
   const [selectedSubmission, setSelectedSubmission] =
     useState<IntakeSubmission | null>(null);
+  const [emailSubmissionId, setEmailSubmissionId] = useState<number | string | null>(null);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -383,37 +389,46 @@ export const Home = () => {
       header: "Actions",
       cell: ({ row }: any) => {
         const sub: IntakeSubmission = row.original;
-        // const ft = sub.first_timer;
         return (
-          <div className="flex items-center gap-2">
-            {/* {ft && (
-              <button
-                onClick={() => {
-                  setSubView("first_timers");
-                  setHighlightedFirstTimerId(ft.id);
-                  setHighlightedSubmissionId(null);
-                  setTimeout(() => {
-                    const el = document.getElementById(`first-timer-row-${ft.id}`);
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }, 150);
-                }}
-                className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-extrabold rounded-xl text-xs transition-colors cursor-pointer inline-flex items-center gap-1"
-                title="Highlight matching Visit Appointment in First-Time Visits table"
-              >
-                <span>See Match</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )} */}
-            <button
-              onClick={() => setSelectedSubmission(sub)}
-              className="px-3 py-1.5 bg-primary-base/10 text-primary-base hover:bg-primary-base/20 font-bold rounded-lg text-xs transition-colors cursor-pointer"
-            >
-              View Details
-            </button>
-          </div>
+          <TooltipProvider delayDuration={150}>
+            <div className="flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setEmailSubmissionId(sub.id)}
+                    className="p-1.5 rounded-lg text-primary-base hover:bg-primary-base/10 transition-colors cursor-pointer border border-transparent hover:border-primary-base/20"
+                    aria-label="Email Intake Form & AI Summary to Studio Team"
+                  >
+                    <Mail className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="font-semibold text-[11px]">Email to Studio Team</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setSelectedSubmission(sub)}
+                    className="p-1.5 rounded-lg text-primary-base hover:bg-primary-base/10 transition-colors cursor-pointer border border-transparent hover:border-primary-base/20"
+                    aria-label="View Submission Details"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="font-semibold text-[11px]">View Submission Details</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         );
       },
     },
+
+
+
   ];
 
   return (
@@ -855,7 +870,14 @@ export const Home = () => {
                 </div>
               </div>
 
-              <div className="p-4 bg-neutral-quaternary/40 border-t border-neutral-tertiary flex justify-end">
+              <div className="p-4 bg-neutral-quaternary/40 border-t border-neutral-tertiary flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setEmailSubmissionId(selectedSubmission.id)}
+                  className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
+                >
+                  <Mail className="w-4 h-4 text-blue-600" />
+                  <span>Email to Studio Team</span>
+                </button>
                 <button
                   onClick={() => setSelectedSubmission(null)}
                   className="px-5 py-2 bg-primary-base hover:bg-opacity-95 text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer"
@@ -867,6 +889,13 @@ export const Home = () => {
           </div>,
           document.body
         )}
+
+      {/* Email Preview & Dispatch Modal */}
+      <IntakeEmailModal
+        isOpen={!!emailSubmissionId}
+        submissionId={emailSubmissionId}
+        onClose={() => setEmailSubmissionId(null)}
+      />
     </div>
   );
 };

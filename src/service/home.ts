@@ -150,3 +150,53 @@ export const getIntakeFormConversion = async (params: {
   );
   return response.data;
 };
+
+export interface IntakeEmailPayload {
+  submission_id: number;
+  recipient: string;
+  location_id: string;
+  location_name: string;
+  client_name: string | null;
+  subject: string;
+  summary_included: boolean;
+  message_id?: string;
+}
+
+export interface IntakeEmailSendResponse {
+  status: string;
+  message: string;
+  data: IntakeEmailPayload;
+}
+
+export interface IntakeEmailPreviewData {
+  submission_id: number;
+  recipient: string | null;
+  location_id: string;
+  location_name: string;
+  client_name: string | null;
+  subject: string;
+  summary_included: boolean;
+  html: string;
+  text: string;
+}
+
+export interface IntakeEmailPreviewResponse {
+  status: string;
+  message: string;
+  data: IntakeEmailPreviewData;
+}
+
+export const sendIntakeEmail = async (submissionId: number | string) => {
+  const response = await api.post<IntakeEmailSendResponse>(
+    `/frontdesk/intake/${submissionId}/email`
+  );
+  return response.data;
+};
+
+export const previewIntakeEmail = async (submissionId: number | string) => {
+  const response = await api.get<IntakeEmailPreviewResponse>(
+    `/frontdesk/intake/${submissionId}/email-preview`
+  );
+  return response.data;
+};
+
