@@ -943,7 +943,7 @@ export const Home = () => {
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
-              First Visits & Intake Follow-ups
+              First Visits
             </h1>
             <p className="text-grey-5 text-xs sm:text-sm mt-1 font-medium">
               Manage first visit intake form submissions, client follow-up checklists, and studio conversion metrics
@@ -1714,8 +1714,8 @@ export const Home = () => {
                     </span>
                     <span
                       className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${noteModalVisit.row.matched || noteModalVisit.row.submission
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          : "bg-amber-100 text-amber-900 border border-amber-200"
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        : "bg-amber-100 text-amber-900 border border-amber-200"
                         }`}
                     >
                       {noteModalVisit.row.matched || noteModalVisit.row.submission
@@ -1770,8 +1770,8 @@ export const Home = () => {
                       disabled={togglingVisitKey === `${noteModalVisit.row.location_id}:${noteModalVisit.row.clubready_user_id}:${noteModalVisit.row.booking_date}`}
                       onClick={() => handleToggleFollowUp(noteModalVisit.row)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-70 ${noteModalVisit.row.follow_up?.checked
-                          ? "bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700"
-                          : "bg-primary-base text-white shadow-2xs hover:bg-primary-base/90"
+                        ? "bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700"
+                        : "bg-primary-base text-white shadow-2xs hover:bg-primary-base/90"
                         }`}
                     >
                       {togglingVisitKey === `${noteModalVisit.row.location_id}:${noteModalVisit.row.clubready_user_id}:${noteModalVisit.row.booking_date}` ? (
