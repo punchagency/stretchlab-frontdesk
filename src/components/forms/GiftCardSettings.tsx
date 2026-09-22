@@ -11,6 +11,8 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { getGiftcardList, saveGiftcard } from "../../service/setting";
 import { renderSuccessToast, renderErrorToast } from "../../utils/toast";
@@ -44,6 +46,8 @@ const formatCategory = (str?: string) =>
 const formatCurrency = (min: number, max: number, currency: string) =>
   `${currency} $${min.toFixed(0)} – $${max.toFixed(0)}`;
 
+const ITEMS_PER_PAGE = 20;
+
 export const GiftCardSettings = () => {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,6 +56,7 @@ export const GiftCardSettings = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [expandedInfoId, setExpandedInfoId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // TanStack Query for Gift Cards List
   const { data: responseData, isLoading, isError, refetch } = useQuery({
@@ -107,6 +112,14 @@ export const GiftCardSettings = () => {
       (gc.description ?? "").toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  // Client-side pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedCards = filtered.slice(
+    (validCurrentPage - 1) * ITEMS_PER_PAGE,
+    validCurrentPage * ITEMS_PER_PAGE
+  );
 
   const selectedCard = giftcards.find((gc) => gc.id === selectedId);
   const savedCard = giftcards.find((gc) => gc.id === savedId);
@@ -169,12 +182,18 @@ export const GiftCardSettings = () => {
                 type="text"
                 placeholder="Search reward gift cards by brand name, category, or description..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-9 py-3 bg-neutral-quaternary/40 border border-neutral-tertiary rounded-xl text-xs font-semibold text-dark-1 placeholder:text-grey-2 focus:outline-none focus:ring-2 focus:ring-primary-base/20 focus:border-primary-base transition-all"
               />
               {search && (
                 <button
-                  onClick={() => setSearch("")}
+                  onClick={() => {
+                    setSearch("");
+                    setCurrentPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-2 hover:text-dark-1"
                 >
                   <X className="w-4 h-4" />
@@ -185,7 +204,10 @@ export const GiftCardSettings = () => {
             {/* Category Chips Row */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar pt-1 border-t border-neutral-tertiary/40">
               <button
-                onClick={() => setActiveCategory("All")}
+                onClick={() => {
+                  setActiveCategory("All");
+                  setCurrentPage(1);
+                }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${activeCategory === "All"
                   ? "bg-primary-base text-white shadow-xs"
                   : "bg-neutral-quaternary text-grey-5 hover:bg-neutral-tertiary hover:text-dark-1"
@@ -196,7 +218,10 @@ export const GiftCardSettings = () => {
               {subcategories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  onClick={() => {
+                    setActiveCategory(cat);
+                    setCurrentPage(1);
+                  }}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${activeCategory === cat
                     ? "bg-primary-base text-white shadow-xs"
                     : "bg-neutral-quaternary text-grey-5 hover:bg-neutral-tertiary hover:text-dark-1"
@@ -209,8 +234,9 @@ export const GiftCardSettings = () => {
           </div>
 
           {/* Gift Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((gc) => {
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedCards.map((gc) => {
               const isSelected = selectedId === gc.id;
               const isSaved = savedId === gc.id;
               const cardImg = gc.images.find((i) => i.type === "card") || gc.images[0];
@@ -316,6 +342,44 @@ export const GiftCardSettings = () => {
                 </div>
               );
             })}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="bg-white p-4 sm:p-5 rounded-3xl border border-neutral-tertiary shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+                <span className="text-xs font-semibold text-grey-5">
+                  Showing <span className="font-extrabold text-dark-1">{(validCurrentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                  <span className="font-extrabold text-dark-1">{Math.min(validCurrentPage * ITEMS_PER_PAGE, filtered.length)}</span> of{" "}
+                  <span className="font-extrabold text-dark-1">{filtered.length}</span> reward options
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={validCurrentPage <= 1}
+                    className="px-3.5 py-2 rounded-xl border border-neutral-tertiary text-xs font-extrabold text-dark-1 bg-neutral-quaternary hover:bg-neutral-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+
+                  <span className="text-xs font-extrabold text-dark-1 px-3">
+                    Page {validCurrentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={validCurrentPage >= totalPages}
+                    className="px-3.5 py-2 rounded-xl border border-neutral-tertiary text-xs font-extrabold text-dark-1 bg-neutral-quaternary hover:bg-neutral-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {filtered.length === 0 && (

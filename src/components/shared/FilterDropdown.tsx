@@ -20,6 +20,7 @@ interface FilterDropdownProps {
   showLabel?: boolean;
   showSearch?: boolean;
   placeholder?: string;
+  disableSort?: boolean;
 }
 
 export const FilterDropdown = ({
@@ -31,6 +32,7 @@ export const FilterDropdown = ({
   showLabel = true,
   showSearch = false,
   placeholder = "Select an option",
+  disableSort = false,
 }: FilterDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,12 +48,19 @@ export const FilterDropdown = ({
   });
 
   const sortOptionsWithSpecialFirst = (optionsToSort: FilterOption[]) => {
-    const specialOptions = ["All", "all"];
-    const special = optionsToSort.filter((option) =>
-      specialOptions.includes(option.value)
+    if (disableSort) return optionsToSort;
+    const specialOptions = ["All", "all", ""];
+    const special = optionsToSort.filter(
+      (option) =>
+        specialOptions.includes(option.value) ||
+        option.label.toLowerCase().startsWith("all ")
     );
     const regular = optionsToSort
-      .filter((option) => !specialOptions.includes(option.value))
+      .filter(
+        (option) =>
+          !specialOptions.includes(option.value) &&
+          !option.label.toLowerCase().startsWith("all ")
+      )
       .sort((a, b) => a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
     return [...special, ...regular];
   };
