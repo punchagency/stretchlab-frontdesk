@@ -31,6 +31,7 @@ interface DataTableProps<TData> {
   searchPlaceholder?: string;
   searchKeys?: string[];
   enableSorting?: boolean;
+  emptyMessage?: React.ReactNode;
 }
 
 export function DataTable<TData>({
@@ -45,6 +46,7 @@ export function DataTable<TData>({
   searchPlaceholder,
   searchKeys,
   enableSorting = true,
+  emptyMessage,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -240,7 +242,7 @@ export function DataTable<TData>({
                 colSpan={columns.length}
                 className="px-6 py-12 text-center text-grey-2 font-semibold"
               >
-                No records found.
+                {emptyMessage || "No records found."}
               </td>
             </tr>
           )}

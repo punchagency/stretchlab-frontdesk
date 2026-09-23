@@ -6,10 +6,20 @@ export interface FrontdeskHomeParams {
   location_id?: string;
   start_date?: string;
   end_date?: string;
+  lookback_days?: number;
+}
+
+export interface FollowUp {
+  checked: boolean;
+  checked_at: string;
+  checked_by: number | null;
+  checked_by_name: string | null;
+  note: string | null;
 }
 
 export interface FirstTimerRecord {
   id: number;
+  source?: "report" | "upcoming";
   config_id?: number;
   client_name?: string;
   clubready_user_id?: string;
@@ -26,6 +36,9 @@ export interface FirstTimerRecord {
   cellphone?: string;
   email?: string;
   status?: string;
+  last_seen_at?: string | null;
+  stale?: boolean;
+  follow_up?: FollowUp | null;
   matched: boolean;
   matched_on?: string | null;
   days_before_visit?: number | null;
@@ -57,15 +70,35 @@ export interface StudioLocation {
   normalized_location_name?: string;
 }
 
+export interface FrontdeskHomeSummary {
+  first_timers_matched?: number;
+  first_timers_total?: number;
+  first_timers_unmatched?: number;
+  first_timers_followed_up?: number;
+  submissions_matched?: number;
+  submissions_total?: number;
+  submissions_unmatched?: number;
+}
+
+export interface HomeWindow {
+  start_date: string;
+  end_date: string;
+  lookback_days: number;
+  upcoming_from: string;
+  upcoming_as_of: string | null;
+}
+
 export interface FrontdeskHomeResponse {
   status: string;
   data: {
     admin_id: number;
-    config_ids: number[];
+    config_ids?: number[];
     locations: StudioLocation[];
     intake_form_ids: string[] | number[];
+    window?: HomeWindow;
     first_timers: FirstTimerRecord[];
     submissions: IntakeSubmission[];
+    summary?: FrontdeskHomeSummary;
     pagination?: {
       page: number;
       page_size: number;
@@ -80,6 +113,190 @@ export const getFrontdeskHome = async (params?: FrontdeskHomeParams) => {
     params,
   });
   return response;
+};
+
+// Follow-ups API
+export interface VisitKey {
+  location_id: string;
+  clubready_user_id: string;
+  booking_date: string;
+}
+
+export interface FollowUpResponse {
+  status: string;
+  data: {
+    visit: {
+      store_id: string;
+      clubready_user_id: string;
+      booking_date: string;
+    };
+    follow_up: FollowUp | null;
+    removed?: boolean;
+  };
+}
+
+export const checkFollowUp = async (visit: VisitKey, note?: string) => {
+  const payload = note === undefined ? visit : { ...visit, note };
+  const response = await api.post<FollowUpResponse>("/frontdesk/follow-ups/check", payload);
+  return response.data;
+};
+
+export const uncheckFollowUp = async (visit: VisitKey) => {
+  const response = await api.post<FollowUpResponse>("/frontdesk/follow-ups/uncheck", visit);
+  return response.data;
+};
+
+export const visitOf = (row: FirstTimerRecord): VisitKey => ({
+  location_id: row.location_id || "",
+  clubready_user_id: row.clubready_user_id || "",
+  booking_date: row.booking_date || "",
+});
+
+// ClubReady Live Refresh API
+export interface RefreshOutcome {
+  location_id: string | null;
+  location_name: string;
+  status: "refreshed" | "failed" | "skipped";
+  first_visits: number | null;
+  removed: number | null;
+  error: string | null;
+}
+
+export interface RefreshResult {
+  status: "success" | "partial" | "error";
+  data: {
+    date: string;
+    refreshed_at: string;
+    locations: RefreshOutcome[];
+    summary: {
+      locations: number;
+      refreshed: number;
+      failed: number;
+      skipped: number;
+      first_visits: number;
+      removed: number;
+    };
+  };
+  message?: string;
+  error?: string;
+}
+
+export const refreshDay = async (day?: string, locationId?: string) => {
+  const payload: { date?: string; location_id?: string } = {};
+  if (day) payload.date = day;
+  if (locationId) payload.location_id = locationId;
+
+  const response = await api.post<RefreshResult>("/frontdesk/upcoming/refresh", payload, {
+    timeout: 11 * 60 * 1000, // 11-minute timeout for scraping up to 10 locations
+  });
+  return response.data;
+};
+
+// Intake Insights API
+export interface Baseline {
+  first_visits: number;
+  with_form: number;
+  rate: number | null;
+}
+
+export interface InsightWeek {
+  week_start: string;
+  week_end: string;
+  complete: boolean;
+  days_reported: number;
+  first_visits: number;
+  with_form: number;
+  rate: number | null;
+  forms_submitted: number;
+  baseline: Baseline | null;
+  p_value: number | null;
+  below_baseline: boolean;
+  missing_days: string[];
+  partial_days: string[];
+  not_selected_days: string[];
+}
+
+export interface Streak {
+  length: number;
+  since: string | null;
+  open_ended: boolean;
+  baseline: Baseline | null;
+  probability: number | null;
+  unusual: boolean;
+}
+
+export type InsightAlert =
+  | {
+      kind: "below_baseline";
+      scope: "totals" | "location";
+      location_id: string | null;
+      location_name: string | null;
+      week_start: string;
+      complete: boolean;
+      first_visits: number;
+      with_form: number;
+      rate: number | null;
+      baseline_rate: number | null;
+      p_value: number | null;
+    }
+  | {
+      kind: "no_form_streak";
+      scope: "location";
+      location_id: string;
+      location_name: string | null;
+      length: number;
+      since: string;
+      baseline_rate: number | null;
+      probability: number | null;
+    }
+  | {
+      kind: "missing_data";
+      scope: "totals" | "location";
+      location_id: string | null;
+      location_name: string | null;
+      days: string[];
+    };
+
+export interface InsightRules {
+  baseline_weeks: number;
+  below_baseline_p: number;
+  streak_baseline_days: number;
+  streak_horizon_days: number;
+  streak_p: number;
+  min_baseline_visits: number;
+  recent_days: number;
+}
+
+export interface IntakeInsightsData {
+  admin_id: number;
+  as_of: string;
+  upcoming_as_of: string | null;
+  rules: InsightRules;
+  alerts: InsightAlert[];
+  totals: {
+    weeks: InsightWeek[];
+  };
+  locations: {
+    location_id: string;
+    location_name: string;
+    robot_selected: boolean | null;
+    streak: Streak;
+    weeks: InsightWeek[];
+  }[];
+}
+
+
+export interface IntakeInsightsResponse {
+  status: string;
+  data: IntakeInsightsData;
+}
+
+export const getIntakeInsights = async (weeks = 8, locationId?: string) => {
+  const params: { weeks: number; location_id?: string } = { weeks };
+  if (locationId) params.location_id = locationId;
+
+  const response = await api.get<IntakeInsightsResponse>("/frontdesk/insights", { params });
+  return response.data;
 };
 
 export interface IntakeFormLocation {
@@ -199,4 +416,5 @@ export const previewIntakeEmail = async (submissionId: number | string) => {
   );
   return response.data;
 };
+
 

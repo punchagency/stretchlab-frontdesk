@@ -6,6 +6,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage } from "./pages";
 import { AppLayout } from "./components/shared";
+import { useVersionCheck } from "./hooks/useVersionCheck";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,6 +17,12 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Wrapper to run the version check hook at root level
+const VersionGuard = ({ children }: { children: React.ReactNode }) => {
+  useVersionCheck();
+  return <>{children}</>;
+};
 
 const router = createBrowserRouter([
   {
@@ -86,8 +93,10 @@ const router = createBrowserRouter([
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster />
+      <VersionGuard>
+        <RouterProvider router={router} />
+        <Toaster />
+      </VersionGuard>
     </QueryClientProvider>
   </StrictMode>
 );

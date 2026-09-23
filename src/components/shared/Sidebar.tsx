@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { MapPin, LogOut, X, ExternalLink } from "lucide-react";
+import { MapPin, LogOut, X, ExternalLink, MessageSquare } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -27,6 +27,17 @@ const menuItems = [
   //   title: "Reviews",
   //   path: "/reviews",
   //   icon: MessageSquare,
+  // },
+
+  {
+    title: "Review Inbox",
+    path: "/review-inbox",
+    icon: MessageSquare,
+  },
+  // {
+  //   title: "Rewards",
+  //   path: "/rewards",
+  //   icon: MapPin,
   // },
 ];
 

@@ -11,4 +11,6 @@ export * from "./AppLayout";
 export * from "./DateRangeFilter";
 export * from "./FilterDropdown";
 export * from "./IntakeEmailModal";
+export * from "./IntakeInsightsModal";
+
 
