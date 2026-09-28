@@ -8,3 +8,4 @@ export * from "./IntakeConversion";
 export * from "./ReviewInbox";
 export * from "./GoalsPage";
 export * from "./ReviewsPage";
+export * from "./ClientActionsPage";

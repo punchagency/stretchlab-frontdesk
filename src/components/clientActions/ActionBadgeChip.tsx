@@ -7,6 +7,7 @@ import {
   Clock,
   CheckCircle2,
   FileWarning,
+  Info,
 } from "lucide-react";
 import { ActionBadge, ClientActionRow } from "../../service/clientActions";
 import {
@@ -128,6 +129,27 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
           ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
           : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100";
 
+      const headline =
+        guidance?.headline ||
+        (count === 0
+          ? "Nothing booked ahead"
+          : count === 1
+          ? "Only 1 visit booked ahead"
+          : `${count} of ${target} visits booked ahead`);
+
+      if (!guidance) {
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs cursor-default ${badgeStyle}`}
+          >
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {headline} ({count}/{target})
+            </span>
+          </span>
+        );
+      }
+
       return (
         <TooltipProvider delayDuration={150}>
           <Tooltip>
@@ -137,66 +159,56 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
               >
                 <CalendarDays className="w-3.5 h-3.5 shrink-0" />
                 <span>
-                  {guidance?.headline
-                    ? `${guidance.headline} (${count}/${target})`
-                    : `Book ahead? (${count}/${target})`}
+                  {headline} ({count}/{target})
                 </span>
+                <Info className="w-3.5 h-3.5 shrink-0 opacity-80" />
               </span>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs space-y-1.5 p-3">
-              {guidance ? (
-                <>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-1">
-                    <p className="font-extrabold text-white text-[11px]">
-                      {guidance.headline}
-                    </p>
-                    <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full ${
-                        priority === "high"
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                          : priority === "medium"
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                          : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
-                      }`}
-                    >
-                      {priority} priority
-                    </span>
+              <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                <p className="font-extrabold text-white text-[11px]">
+                  {guidance.headline}
+                </p>
+                <span
+                  className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full ${
+                    priority === "high"
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                      : priority === "medium"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
+                  }`}
+                >
+                  {priority} priority
+                </span>
+              </div>
+
+              {guidance.suggestion && (
+                <p className="text-[11px] text-zinc-200 leading-snug">
+                  {guidance.suggestion}
+                </p>
+              )}
+
+              {guidance.suggested_dates && guidance.suggested_dates.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                    Suggested Dates (Member Habit):
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {guidance.suggested_dates.map((d) => (
+                      <span
+                        key={d}
+                        className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono text-[10px] font-bold"
+                      >
+                        {d}
+                      </span>
+                    ))}
                   </div>
+                </div>
+              )}
 
-                  {guidance.suggestion && (
-                    <p className="text-[11px] text-zinc-200 leading-snug">
-                      {guidance.suggestion}
-                    </p>
-                  )}
-
-                  {guidance.suggested_dates && guidance.suggested_dates.length > 0 && (
-                    <div className="pt-1">
-                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                        Suggested Dates (Member Habit):
-                      </p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {guidance.suggested_dates.map((d) => (
-                          <span
-                            key={d}
-                            className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono text-[10px] font-bold"
-                          >
-                            {d}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {guidance.action && (
-                    <p className="text-[10px] text-amber-300 font-medium italic pt-0.5">
-                      💡 {guidance.action}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p>
-                  Client has {count} future session{count === 1 ? "" : "s"} booked
-                  after this day (Studio target: {target}). Offer to book ahead at checkout!
+              {guidance.action && (
+                <p className="text-[10px] text-amber-300 font-medium italic pt-0.5">
+                  💡 {guidance.action}
                 </p>
               )}
             </TooltipContent>

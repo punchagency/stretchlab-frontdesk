@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Navigate, useSearchParams } from "react-router";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getFrontdeskHome,
@@ -38,44 +38,41 @@ import {
   Info,
   AlertTriangle,
   Loader2,
-  Target,
 } from "lucide-react";
 
 import { DataTable, ErrorHandle, IntakeEmailModal, IntakeInsightsPanel } from "../components/shared";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import { renderSuccessToast, renderErrorToast } from "../utils/toast";
 import { IntakeConversion } from "./IntakeConversion";
-import { ClientActionsTab } from "../components/clientActions";
 
 export const Home = () => {
   const token = getUserCookie();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
   const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<"actions" | "submissions" | "performance" | "insights">(
-    tabParam === "submissions"
-      ? "submissions"
-      : tabParam === "performance"
+  const [activeTab, setActiveTab] = useState<"submissions" | "performance" | "insights">(
+    tabParam === "performance"
       ? "performance"
       : tabParam === "insights"
       ? "insights"
-      : "actions"
+      : "submissions"
   );
 
   const [subView, setSubView] = useState<"first_timers" | "submissions">("first_timers");
 
   useEffect(() => {
-    if (tabParam === "submissions") {
-      setActiveTab("submissions");
+    if (tabParam === "actions") {
+      navigate("/", { replace: true });
     } else if (tabParam === "performance") {
       setActiveTab("performance");
     } else if (tabParam === "insights") {
       setActiveTab("insights");
     } else {
-      setActiveTab("actions");
+      setActiveTab("submissions");
     }
-  }, [tabParam]);
+  }, [tabParam, navigate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,10 +85,9 @@ export const Home = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-
-  const handleTabChange = (tab: "actions" | "submissions" | "performance" | "insights") => {
+  const handleTabChange = (tab: "submissions" | "performance" | "insights") => {
     setActiveTab(tab);
-    setSearchParams(tab === "actions" ? {} : { tab });
+    setSearchParams(tab === "submissions" ? {} : { tab });
   };
 
   const [page, setPage] = useState(1);
@@ -966,18 +962,14 @@ export const Home = () => {
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
-              {activeTab === "actions"
-                ? "Today's Critical Client Actions"
-                : activeTab === "performance"
+              {activeTab === "performance"
                 ? "Conversion Performance"
                 : activeTab === "insights"
                 ? "Intake Insights"
                 : "First Visits"}
             </h1>
             <p className="text-grey-5 text-xs sm:text-sm mt-1 font-medium">
-              {activeTab === "actions"
-                ? "Daily desk checklist: intake form follow-ups, MAPS re-assessments due, booking targets, and 90-day client goals"
-                : activeTab === "performance"
+              {activeTab === "performance"
                 ? "Monitor intake submission rates and membership conversions across studios"
                 : activeTab === "insights"
                 ? "Understand client pain points, health histories, and recovery goals"
@@ -987,7 +979,7 @@ export const Home = () => {
 
           <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
             {/* ClubReady Live Refresh Button */}
-            {(activeTab === "actions" || activeTab === "submissions") && (
+            {activeTab === "submissions" && (
               <div className="flex flex-col sm:items-end gap-1.5">
                 <button
                   onClick={handleLiveRefresh}
@@ -1110,17 +1102,6 @@ export const Home = () => {
           <div className="inline-flex items-center p-1.5 bg-neutral-quaternary rounded-2xl border border-neutral-tertiary">
             <button
               type="button"
-              onClick={() => handleTabChange("actions")}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${activeTab === "actions"
-                ? "bg-white text-primary-base shadow-sm border border-neutral-tertiary"
-                : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
-                }`}
-            >
-              <Target className="w-4 h-4 text-primary-base" />
-              <span>Today's Critical Client Actions</span>
-            </button>
-            <button
-              type="button"
               onClick={() => handleTabChange("submissions")}
               className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${activeTab === "submissions"
                 ? "bg-white text-primary-base shadow-sm border border-neutral-tertiary"
@@ -1156,12 +1137,7 @@ export const Home = () => {
         </div>
       </div>
 
-      {activeTab === "actions" ? (
-        <ClientActionsTab
-          locations={homeData?.locations || []}
-          initialLocationId={selectedLocation}
-        />
-      ) : activeTab === "performance" ? (
+      {activeTab === "performance" ? (
         <IntakeConversion hideHeader={true} />
       ) : activeTab === "insights" ? (
         <IntakeInsightsPanel selectedLocationId={selectedLocation || undefined} />

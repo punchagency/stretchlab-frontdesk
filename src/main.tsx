@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import "./index.css";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage } from "./pages";
+import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage, ClientActionsPage } from "./pages";
 import { AppLayout } from "./components/shared";
 import { useVersionCheck } from "./hooks/useVersionCheck";
 
@@ -27,6 +27,24 @@ const VersionGuard = ({ children }: { children: React.ReactNode }) => {
 const router = createBrowserRouter([
   {
     path: "/",
+    element: (
+      <AppLayout>
+        <ClientActionsPage />
+      </AppLayout>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/client-actions",
+    element: (
+      <AppLayout>
+        <ClientActionsPage />
+      </AppLayout>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/first-visits",
     element: (
       <AppLayout>
         <Home />
@@ -54,11 +72,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/intake-conversion",
-    element: <Navigate to="/?tab=performance" replace />,
-  },
-  {
-    path: "/client-actions",
-    element: <Navigate to="/?tab=actions" replace />,
+    element: <Navigate to="/first-visits?tab=performance" replace />,
   },
   {
     path: "/review-inbox",
