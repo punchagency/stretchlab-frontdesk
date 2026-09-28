@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { MapPin, LogOut, X, ExternalLink, MessageSquare } from "lucide-react";
+import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -14,8 +14,13 @@ const noteAppURL = import.meta.env.VITE_REDIRECT_URL || "https://stretchnote.com
 
 const menuItems = [
   {
-    title: "First Visits",
+    title: "Today's Actions",
     path: "/",
+    icon: Target,
+  },
+  {
+    title: "First Visits",
+    path: "/first-visits",
     icon: MapPin,
   },
   // {
@@ -60,7 +65,12 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     }
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path === "/") {
+      return location.pathname === "/" || location.pathname === "/client-actions";
+    }
+    return location.pathname === path;
+  };
 
 
   const displayName =
