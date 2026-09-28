@@ -153,29 +153,51 @@ export const visitOf = (row: FirstTimerRecord): VisitKey => ({
 });
 
 // ClubReady Live Refresh API
+export type RefreshStatus = "refreshed" | "failed" | "skipped";
+
+export interface LocationBookingsOutcome {
+  status: RefreshStatus;
+  made_today: number | null;
+  removed: number | null;
+  error: string | null;
+}
+
 export interface RefreshOutcome {
   location_id: string | null;
   location_name: string;
-  status: "refreshed" | "failed" | "skipped";
+  status: RefreshStatus;
   first_visits: number | null;
   removed: number | null;
   error: string | null;
+  bookings?: LocationBookingsOutcome;
+}
+
+export interface BookingsRefreshSummary {
+  refreshed: number;
+  failed: number;
+  skipped: number;
+  made_today: number;
+  removed: number;
+}
+
+export interface RefreshSummary {
+  locations: number;
+  refreshed: number;
+  failed: number;
+  skipped: number;
+  first_visits: number;
+  removed: number;
+  bookings?: BookingsRefreshSummary;
 }
 
 export interface RefreshResult {
   status: "success" | "partial" | "error";
   data: {
     date: string;
+    bookings_date?: string;
     refreshed_at: string;
     locations: RefreshOutcome[];
-    summary: {
-      locations: number;
-      refreshed: number;
-      failed: number;
-      skipped: number;
-      first_visits: number;
-      removed: number;
-    };
+    summary: RefreshSummary;
   };
   message?: string;
   error?: string;

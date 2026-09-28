@@ -57,6 +57,10 @@ const router = createBrowserRouter([
     element: <Navigate to="/?tab=performance" replace />,
   },
   {
+    path: "/client-actions",
+    element: <Navigate to="/?tab=actions" replace />,
+  },
+  {
     path: "/review-inbox",
     element: (
       <AppLayout>

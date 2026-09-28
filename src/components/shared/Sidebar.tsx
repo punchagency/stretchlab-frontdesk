@@ -62,6 +62,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
+
   const displayName =
     userInfo?.name ||
     userInfo?.username ||

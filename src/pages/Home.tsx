@@ -12,6 +12,7 @@ import {
   FirstTimerRecord,
   StudioLocation,
   RefreshOutcome,
+  RefreshSummary,
   VisitKey,
   FrontdeskHomeResponse,
 } from "../service/home";
@@ -37,12 +38,14 @@ import {
   Info,
   AlertTriangle,
   Loader2,
+  Target,
 } from "lucide-react";
 
 import { DataTable, ErrorHandle, IntakeEmailModal, IntakeInsightsPanel } from "../components/shared";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import { renderSuccessToast, renderErrorToast } from "../utils/toast";
 import { IntakeConversion } from "./IntakeConversion";
+import { ClientActionsTab } from "../components/clientActions";
 
 export const Home = () => {
   const token = getUserCookie();
@@ -50,19 +53,27 @@ export const Home = () => {
   const queryClient = useQueryClient();
 
   const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<"submissions" | "performance" | "insights">(
-    tabParam === "performance" ? "performance" : tabParam === "insights" ? "insights" : "submissions"
+  const [activeTab, setActiveTab] = useState<"actions" | "submissions" | "performance" | "insights">(
+    tabParam === "submissions"
+      ? "submissions"
+      : tabParam === "performance"
+      ? "performance"
+      : tabParam === "insights"
+      ? "insights"
+      : "actions"
   );
 
   const [subView, setSubView] = useState<"first_timers" | "submissions">("first_timers");
 
   useEffect(() => {
-    if (tabParam === "performance") {
+    if (tabParam === "submissions") {
+      setActiveTab("submissions");
+    } else if (tabParam === "performance") {
       setActiveTab("performance");
     } else if (tabParam === "insights") {
       setActiveTab("insights");
     } else {
-      setActiveTab("submissions");
+      setActiveTab("actions");
     }
   }, [tabParam]);
 
@@ -78,9 +89,9 @@ export const Home = () => {
   }, []);
 
 
-  const handleTabChange = (tab: "submissions" | "performance" | "insights") => {
+  const handleTabChange = (tab: "actions" | "submissions" | "performance" | "insights") => {
     setActiveTab(tab);
-    setSearchParams(tab === "submissions" ? {} : { tab });
+    setSearchParams(tab === "actions" ? {} : { tab });
   };
 
   const [page, setPage] = useState(1);
@@ -113,6 +124,7 @@ export const Home = () => {
     title: string;
     description: string;
     outcomes?: RefreshOutcome[];
+    summary?: RefreshSummary;
   } | null>(null);
 
   if (!token) {
@@ -334,6 +346,7 @@ export const Home = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["frontdesk-home", homeQueryParams] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-client-actions"] });
     },
   });
 
@@ -418,27 +431,37 @@ export const Home = () => {
     try {
       const res = await refreshDay(targetDay, selectedLocation || undefined);
       if (res.status === "success") {
+        const bookingsSummary = res.data.summary.bookings;
+        const bookingsText = bookingsSummary
+          ? ` • Today's bookings: ${bookingsSummary.made_today || 0} made today, ${bookingsSummary.removed || 0} cancelled/moved`
+          : "";
         setRefreshBanner({
           type: "success",
           title: "Refresh Completed",
-          description: `Successfully refreshed ${res.data.summary.refreshed} location(s) from ClubReady for ${targetDay}.`,
+          description: `Successfully refreshed ${res.data.summary.refreshed} location(s) for ${targetDay}.${bookingsText}`,
           outcomes: res.data.locations,
+          summary: res.data.summary,
         });
       } else if (res.status === "partial") {
         setRefreshBanner({
           type: "warning",
           title: "Partial Refresh Completed",
-          description: `${res.data.summary.refreshed} location(s) refreshed, but ${res.data.summary.failed} location(s) couldn't be updated right now.`,
+          description: `${res.data.summary.refreshed} of ${res.data.summary.locations} location(s) refreshed. Some location data could not be updated right now.`,
           outcomes: res.data.locations,
+          summary: res.data.summary,
         });
       } else {
         setRefreshBanner({
           type: "error",
           title: "Refresh Failed",
-          description: "Could not refresh first visit records from ClubReady at this time. Please try again shortly.",
+          description: "Could not refresh records from ClubReady at this time. Its list is from this morning. Try again in a minute.",
           outcomes: res.data.locations,
+          summary: res.data.summary,
         });
       }
+      // Invalidate queries so both First Visits and Client Actions tabs get fresh data
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-home"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-client-actions"] });
       refetch();
     } catch (err: any) {
       if (err.response?.status === 409) {
@@ -663,13 +686,13 @@ export const Home = () => {
                   <TooltipProvider delayDuration={150}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-700 rounded border border-zinc-300">
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-700 rounded border border-zinc-300 cursor-help">
                           Stale
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p className="text-[11px]">
-                          Scrape missed last night. Last seen: {formatUtcTimestamp(ft.last_seen_at)}
+                      <TooltipContent side="top" className="max-w-xs text-xs p-2.5">
+                        <p className="text-[11px] leading-relaxed">
+                          As of {formatUtcTimestamp(ft.last_seen_at) || "earlier"} — not seen in latest runs; that location's scrape may have missed it, or the booking may have been cancelled.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -943,26 +966,59 @@ export const Home = () => {
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
-              First Visits
+              {activeTab === "actions"
+                ? "Today's Critical Client Actions"
+                : activeTab === "performance"
+                ? "Conversion Performance"
+                : activeTab === "insights"
+                ? "Intake Insights"
+                : "First Visits"}
             </h1>
             <p className="text-grey-5 text-xs sm:text-sm mt-1 font-medium">
-              Manage first visit intake form submissions, client follow-up checklists, and studio conversion metrics
+              {activeTab === "actions"
+                ? "Daily desk checklist: intake form follow-ups, MAPS re-assessments due, booking targets, and 90-day client goals"
+                : activeTab === "performance"
+                ? "Monitor intake submission rates and membership conversions across studios"
+                : activeTab === "insights"
+                ? "Understand client pain points, health histories, and recovery goals"
+                : "Manage first visit intake form submissions, client follow-up checklists, and studio conversion metrics"}
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
             {/* ClubReady Live Refresh Button */}
-            {activeTab === "submissions" && (
-              <button
-                onClick={handleLiveRefresh}
-                disabled={isRefreshing || isRefetching}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#368591] hover:bg-[#2c6d77] text-white font-extrabold rounded-xl text-xs transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-                />
-                {isRefreshing ? "Refreshing ClubReady..." : "Refresh from ClubReady"}
-              </button>
+            {(activeTab === "actions" || activeTab === "submissions") && (
+              <div className="flex flex-col sm:items-end gap-1.5">
+                <button
+                  onClick={handleLiveRefresh}
+                  disabled={isRefreshing || isRefetching}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#368591] hover:bg-[#2c6d77] text-white font-extrabold rounded-xl text-xs transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                  {isRefreshing ? "Refreshing ClubReady..." : "Refresh from ClubReady"}
+                </button>
+                {homeData?.window?.upcoming_as_of && (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-grey-5 hover:text-dark-1 transition-colors cursor-help px-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                          <span>Synced: {formatUtcTimestamp(homeData.window.upcoming_as_of)}</span>
+                          <Info className="w-3 h-3 text-grey-2" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="end" className="max-w-xs text-xs p-3">
+                        <p className="font-extrabold text-white mb-1">ClubReady Sync Schedule</p>
+                        <p className="text-[11px] text-zinc-300 leading-relaxed">
+                          First visits and bookings automatically sync nightly at 07:30 UTC and throughout the day at 14:00, 17:00, and 20:00 UTC. Click "Refresh from ClubReady" to pull latest changes on demand.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -990,20 +1046,39 @@ export const Home = () => {
                 <p className="mt-0.5 font-medium">{refreshBanner.description}</p>
 
                 {refreshBanner.outcomes && refreshBanner.outcomes.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {refreshBanner.outcomes.map((loc, idx) => (
-                      <span
-                        key={idx}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${loc.status === "refreshed"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : loc.status === "failed"
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-zinc-100 text-zinc-700"
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {refreshBanner.outcomes.map((loc, idx) => {
+                      const fvSuccess = loc.status === "refreshed";
+                      const bkSuccess = loc.bookings?.status === "refreshed";
+                      const allGood = fvSuccess && (!loc.bookings || bkSuccess);
+                      const allFailed = loc.status === "failed" && (!loc.bookings || loc.bookings.status === "failed");
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border flex flex-col gap-0.5 shadow-2xs ${
+                            allGood
+                              ? "bg-white/90 border-emerald-300 text-emerald-950"
+                              : allFailed
+                              ? "bg-white/90 border-rose-300 text-rose-950"
+                              : "bg-white/90 border-amber-300 text-amber-950"
                           }`}
-                      >
-                        {loc.location_name}: {loc.status === "refreshed" ? `${loc.first_visits || 0} visits` : loc.status}
-                      </span>
-                    ))}
+                        >
+                          <span className="font-extrabold text-[11.5px]">{loc.location_name}</span>
+                          <span className="text-[10px] text-grey-5 font-medium">
+                            First Visits: {fvSuccess ? `${loc.first_visits ?? 0} booked` : loc.status}
+                            {loc.bookings && (
+                              <> • Bookings: {bkSuccess ? `${loc.bookings.made_today ?? 0} made today, ${loc.bookings.removed ?? 0} cancelled` : loc.bookings.status}</>
+                            )}
+                          </span>
+                          {(loc.status === "failed" || loc.bookings?.status === "failed") && (
+                            <span className="text-[9.5px] font-medium text-rose-700 italic">
+                              List is from this morning. Try again in a minute.
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1018,7 +1093,7 @@ export const Home = () => {
         )}
 
         {/* Upcoming Not Available Banner */}
-        {homeData?.window && homeData.window.upcoming_as_of === null && (
+        {activeTab === "submissions" && homeData?.window && homeData.window.upcoming_as_of === null && (
           <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3 text-xs">
             <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <div>
@@ -1035,8 +1110,19 @@ export const Home = () => {
           <div className="inline-flex items-center p-1.5 bg-neutral-quaternary rounded-2xl border border-neutral-tertiary">
             <button
               type="button"
+              onClick={() => handleTabChange("actions")}
+              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${activeTab === "actions"
+                ? "bg-white text-primary-base shadow-sm border border-neutral-tertiary"
+                : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
+                }`}
+            >
+              <Target className="w-4 h-4 text-primary-base" />
+              <span>Today's Critical Client Actions</span>
+            </button>
+            <button
+              type="button"
               onClick={() => handleTabChange("submissions")}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 ${activeTab === "submissions"
+              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${activeTab === "submissions"
                 ? "bg-white text-primary-base shadow-sm border border-neutral-tertiary"
                 : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
                 }`}
@@ -1047,7 +1133,7 @@ export const Home = () => {
             <button
               type="button"
               onClick={() => handleTabChange("performance")}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 ${activeTab === "performance"
+              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${activeTab === "performance"
                 ? "bg-white text-primary-base shadow-sm border border-neutral-tertiary"
                 : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
                 }`}
@@ -1058,7 +1144,7 @@ export const Home = () => {
             <button
               type="button"
               onClick={() => handleTabChange("insights")}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 ${activeTab === "insights"
+              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${activeTab === "insights"
                 ? "bg-white text-primary-base shadow-sm border border-neutral-tertiary"
                 : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
                 }`}
@@ -1070,7 +1156,12 @@ export const Home = () => {
         </div>
       </div>
 
-      {activeTab === "performance" ? (
+      {activeTab === "actions" ? (
+        <ClientActionsTab
+          locations={homeData?.locations || []}
+          initialLocationId={selectedLocation}
+        />
+      ) : activeTab === "performance" ? (
         <IntakeConversion hideHeader={true} />
       ) : activeTab === "insights" ? (
         <IntakeInsightsPanel selectedLocationId={selectedLocation || undefined} />
@@ -1552,7 +1643,9 @@ export const Home = () => {
                 enableSorting={true}
                 rowId={(row: FirstTimerRecord) => `${row.source || "upcoming"}:${row.id}`}
                 rowClassName={(row: FirstTimerRecord) =>
-                  row.submission || row.matched
+                  row.stale
+                    ? "opacity-75 bg-zinc-50/70 hover:bg-zinc-100/60 font-semibold transition-all duration-200"
+                    : row.submission || row.matched
                     ? "hover:bg-neutral-quaternary/40 font-semibold transition-all duration-200"
                     : "bg-amber-50/25 hover:bg-amber-50/50 font-semibold transition-all duration-200"
                 }
