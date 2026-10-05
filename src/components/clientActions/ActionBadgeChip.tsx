@@ -9,7 +9,7 @@ import {
   FileWarning,
   Info,
 } from "lucide-react";
-import { ActionBadge, ClientActionRow } from "../../service/clientActions";
+import { ActionBadge, ClientActionRow, localDay } from "../../service/clientActions";
 import {
   Tooltip,
   TooltipContent,
@@ -20,20 +20,33 @@ import {
 interface ActionBadgeChipProps {
   badgeKey: ActionBadge;
   row: ClientActionRow;
+  todayStr?: string;
   onGoalClick: (row: ClientActionRow) => void;
   onToggleFollowUp: (row: ClientActionRow) => void;
   onOpenNoteModal?: (row: ClientActionRow) => void;
+  onLogMaps?: (row: ClientActionRow) => void;
+  onLogBookNext?: (row: ClientActionRow, count?: number) => void;
 }
 
 export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
   badgeKey,
   row,
+  todayStr,
   onGoalClick,
   onToggleFollowUp,
+  onLogMaps,
+  onLogBookNext,
 }) => {
+  const currentToday = todayStr || localDay();
+  const isToday = row.booking_date === currentToday;
+
   switch (badgeKey) {
     case "intake_form_missing": {
       const isReminded = Boolean(row.intake?.follow_up?.checked);
+      const actionInstruction = isToday
+        ? "Resend text from SMS platform to have client fill out intake form upon arrival so we can provide the best service"
+        : "Send text from SMS platform to remind client to fill out form prior to arrival so we can provide the best service";
+
       return (
         <TooltipProvider delayDuration={150}>
           <Tooltip>
@@ -46,37 +59,58 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                 }}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer border ${
                   isReminded
-                    ? "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
                     : "bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100 shadow-2xs"
                 }`}
               >
-                <FileText className="w-3.5 h-3.5" />
-                <span>
-                  {isReminded
-                    ? "Form missing · ✓ Reminded"
-                    : "Form missing · Remind"}
-                </span>
+                {isReminded ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{isReminded ? "Intake Form ✓" : "Intake Form"}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs">
+            <TooltipContent side="top" className="max-w-xs text-xs space-y-1.5 p-3">
               {isReminded ? (
-                <div className="space-y-0.5">
-                  <p className="font-bold text-emerald-400">Intake Reminded</p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                    <p className="font-extrabold text-emerald-400 text-[11px]">
+                      Intake Form Reminded
+                    </p>
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Done
+                    </span>
+                  </div>
                   {row.intake?.follow_up?.checked_by_name && (
-                    <p>By: {row.intake.follow_up.checked_by_name}</p>
+                    <p className="text-[11px] text-zinc-200">
+                      Action taken by: <strong className="text-white">{row.intake.follow_up.checked_by_name}</strong>
+                    </p>
                   )}
                   {row.intake?.follow_up?.note && (
-                    <p className="italic">Note: "{row.intake.follow_up.note}"</p>
+                    <p className="text-[11px] text-zinc-300 italic">
+                      Note: "{row.intake.follow_up.note}"
+                    </p>
                   )}
-                  <p className="text-[10px] text-zinc-300 mt-1">
-                    Click to toggle status
+                  <p className="text-[10px] text-zinc-300 pt-0.5 leading-snug">
+                    {actionInstruction}
+                  </p>
+                  <p className="text-[10px] text-zinc-400 pt-0.5">
+                    (Click to toggle status)
                   </p>
                 </div>
               ) : (
-                <p>
-                  First-time client has not submitted their intake form. Click to
-                  mark reminded.
-                </p>
+                <div className="space-y-1">
+                  <p className="font-extrabold text-rose-400 text-[11px]">
+                    Intake Form Action Needed
+                  </p>
+                  <p className="text-[11px] text-zinc-200 leading-snug">
+                    {actionInstruction}
+                  </p>
+                  <p className="text-[10px] text-zinc-400 pt-0.5">
+                    (Click to mark reminded)
+                  </p>
+                </div>
               )}
             </TooltipContent>
           </Tooltip>
@@ -89,12 +123,19 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
         <TooltipProvider delayDuration={150}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs cursor-default">
-                <Target className="w-3.5 h-3.5 text-slate-500" />
-                <span>MAPS Due</span>
-              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLogMaps?.(row);
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                <Target className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span>MAPS</span>
+              </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs">
+            <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
               {row.maps.last_reading ? (
                 <div className="space-y-0.5">
                   <p className="font-bold">Last MAPS Assessment:</p>
@@ -110,6 +151,11 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                   No MAPS reading at this studio in the last 30 days. Book assessment.
                 </p>
               )}
+              {onLogMaps && (
+                <p className="text-[10px] text-slate-300 font-bold pt-0.5">
+                  👉 Click to log MAPS completed
+                </p>
+              )}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -120,6 +166,7 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
       const guidance = row.booking_guidance;
       const count = guidance?.booked_ahead ?? row.future_bookings.count ?? 0;
       const target = guidance?.target ?? row.future_bookings.target ?? 4;
+      const needed = guidance?.to_book ?? Math.max(1, target - count);
       const priority = guidance?.priority ?? (count === 0 ? "high" : count === 1 ? "medium" : "low");
 
       const badgeStyle =
@@ -129,24 +176,21 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
           ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
           : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100";
 
-      const headline =
-        guidance?.headline ||
-        (count === 0
-          ? "Nothing booked ahead"
-          : count === 1
-          ? "Only 1 visit booked ahead"
-          : `${count} of ${target} visits booked ahead`);
+      const headline = `Book Next ${needed} Appointment${needed === 1 ? "" : "s"}`;
 
       if (!guidance) {
         return (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs cursor-default ${badgeStyle}`}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onLogBookNext?.(row, needed);
+            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs cursor-pointer ${badgeStyle}`}
           >
             <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-            <span>
-              {headline} ({count}/{target})
-            </span>
-          </span>
+            <span>{headline}</span>
+          </button>
         );
       }
 
@@ -154,20 +198,23 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
         <TooltipProvider delayDuration={150}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-colors cursor-help shadow-2xs ${badgeStyle}`}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLogBookNext?.(row, needed);
+                }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-colors cursor-pointer shadow-2xs ${badgeStyle}`}
               >
                 <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                <span>
-                  {headline} ({count}/{target})
-                </span>
+                <span>{headline}</span>
                 <Info className="w-3.5 h-3.5 shrink-0 opacity-80" />
-              </span>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs space-y-1.5 p-3">
               <div className="flex items-center justify-between border-b border-white/10 pb-1">
                 <p className="font-extrabold text-white text-[11px]">
-                  {guidance.headline}
+                  {guidance.headline || headline}
                 </p>
                 <span
                   className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full ${
@@ -187,6 +234,26 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                   {guidance.suggestion}
                 </p>
               )}
+
+              {guidance.booking_habit && (
+                <div className="pt-0.5 text-[11px] text-zinc-300 font-medium bg-white/5 p-2 rounded-lg border border-white/10 space-y-0.5">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-400" /> Member Booking Habit
+                  </p>
+                  <p className="text-zinc-200 text-xs leading-snug">
+                    {guidance.booking_habit}
+                  </p>
+                </div>
+              )}
+
+              {row.future_bookings.bookings !== undefined &&
+                row.future_bookings.bookings !== null &&
+                row.future_bookings.count !== null &&
+                row.future_bookings.bookings !== row.future_bookings.count && (
+                  <p className="text-[10px] text-zinc-300 font-medium">
+                    Schedule: <strong className="text-white">{row.future_bookings.count} appointments</strong> ({row.future_bookings.bookings} total session bookings)
+                  </p>
+                )}
 
               {guidance.suggested_dates && guidance.suggested_dates.length > 0 && (
                 <div className="pt-1">
@@ -211,6 +278,12 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                   💡 {guidance.action}
                 </p>
               )}
+
+              {onLogBookNext && (
+                <p className="text-[10px] text-indigo-300 font-bold pt-0.5">
+                  👉 Click to log {needed} appointment{needed === 1 ? "" : "s"} booked
+                </p>
+              )}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -230,8 +303,8 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                 }}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer shadow-2xs"
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                <span>No goal on file</span>
+                <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                <span>Goal</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
@@ -258,15 +331,20 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                 }}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
               >
-                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                <span>Goal update due ({row.goal.days_since}d)</span>
+                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Goal (Update Due)</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs">
+            <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
               <div className="space-y-0.5">
-                <p className="font-bold text-amber-300">Goal 90+ days old</p>
-                <p className="italic">"{row.goal.goal}"</p>
-                <p className="text-[10px] text-zinc-300">
+                <p className="font-bold text-amber-300">Goal 90+ days old ({row.goal.days_since}d)</p>
+                <p className="italic text-zinc-200">"{row.goal.goal}"</p>
+                {row.goal.source && (
+                  <p className="text-[10px] text-zinc-400 capitalize">
+                    Source: {row.goal.source.replace("_", " ")}
+                  </p>
+                )}
+                <p className="text-[10px] text-zinc-300 pt-0.5">
                   Click to confirm if still same or update
                 </p>
               </div>
@@ -291,7 +369,7 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-orange-50 text-orange-900 border border-orange-300 hover:bg-orange-100 transition-colors cursor-pointer shadow-2xs"
               >
                 <FileWarning className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                <span>Template goal ({templateClients})</span>
+                <span>Goal (Template)</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs space-y-1.5 p-3">
@@ -330,6 +408,8 @@ interface ActionBadgeListProps {
   onGoalClick: (row: ClientActionRow) => void;
   onToggleFollowUp: (row: ClientActionRow) => void;
   onOpenNoteModal?: (row: ClientActionRow) => void;
+  onLogMaps?: (row: ClientActionRow) => void;
+  onLogBookNext?: (row: ClientActionRow, count?: number) => void;
 }
 
 export const ActionBadgeList: React.FC<ActionBadgeListProps> = ({
@@ -337,6 +417,8 @@ export const ActionBadgeList: React.FC<ActionBadgeListProps> = ({
   onGoalClick,
   onToggleFollowUp,
   onOpenNoteModal,
+  onLogMaps,
+  onLogBookNext,
 }) => {
   if (row.badges.length === 0) {
     return (
@@ -357,6 +439,8 @@ export const ActionBadgeList: React.FC<ActionBadgeListProps> = ({
           onGoalClick={onGoalClick}
           onToggleFollowUp={onToggleFollowUp}
           onOpenNoteModal={onOpenNoteModal}
+          onLogMaps={onLogMaps}
+          onLogBookNext={onLogBookNext}
         />
       ))}
     </div>

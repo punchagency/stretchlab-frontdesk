@@ -14,6 +14,15 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  CartesianGrid,
+} from "recharts";
+import {
   AlertTriangle,
   TrendingDown,
   TrendingUp,
@@ -79,8 +88,49 @@ const formatWeekRange = (startStr: string, endStr: string) => {
   return `${startStr} to ${endStr}`;
 };
 
+const formatWeekShort = (startStr: string, endStr: string) => {
+  try {
+    const sParts = startStr.split("-");
+    const eParts = endStr.split("-");
+    if (sParts.length === 3 && eParts.length === 3) {
+      const sDate = new Date(
+        parseInt(sParts[0], 10),
+        parseInt(sParts[1], 10) - 1,
+        parseInt(sParts[2], 10)
+      );
+      const eDate = new Date(
+        parseInt(eParts[0], 10),
+        parseInt(eParts[1], 10) - 1,
+        parseInt(eParts[2], 10)
+      );
+
+      const sMonth = sDate.toLocaleString("en-US", { month: "short" });
+      const eMonth = eDate.toLocaleString("en-US", { month: "short" });
+
+      if (sMonth === eMonth) {
+        return `${sMonth} ${sDate.getDate()}–${eDate.getDate()}`;
+      } else {
+        return `${sMonth} ${sDate.getDate()}–${eMonth} ${eDate.getDate()}`;
+      }
+    }
+  } catch {
+    return startStr;
+  }
+  return startStr;
+};
+
 const pct = (n: number | null | undefined) =>
   n !== null && n !== undefined ? `${n.toFixed(1)}%` : "N/A";
+
+const getFormsSubmittedTooltip = (formsSubmitted: number, withForm: number) => {
+  if (withForm > formsSubmitted) {
+    return `${withForm} first-time visits this week had an intake form on file (including forms completed in advance prior to this week), while ${formsSubmitted} new form${formsSubmitted !== 1 ? "s were" : " was"} submitted during this week.`;
+  }
+  if (formsSubmitted > withForm) {
+    return `${formsSubmitted} form${formsSubmitted !== 1 ? "s were" : " was"} submitted this week, and ${withForm} matched to this week's first-time visits (remaining forms may belong to repeat clients or upcoming visits in future weeks).`;
+  }
+  return `All ${formsSubmitted} form${formsSubmitted !== 1 ? "s" : ""} submitted this week matched to first-time visits.`;
+};
 
 /* ─────────────────────────────────── tooltip ──────────────────────────────── */
 
@@ -120,13 +170,13 @@ const WeekStatusBadge: React.FC<{ week: InsightWeek }> = ({ week }) => {
 
   if (week.below_baseline) {
     const message = baselineRateStr
-      ? `Form rate (${currentRateStr}) dropped significantly below the 4-week baseline (${baselineRateStr}). Attention needed.`
-      : "Form rate dropped noticeably below the studio baseline. Attention needed.";
+      ? `Submission rate (${currentRateStr}) dropped significantly below the prior 4-week average baseline (${baselineRateStr}). Attention needed.`
+      : "Submission rate dropped noticeably below the studio baseline. Attention needed.";
 
     return (
       <Tooltip content={message}>
-        <span className="inline-flex items-center gap-1 text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 cursor-help">
-          <TrendingDown className="w-3.5 h-3.5" /> Below
+        <span className="inline-flex items-center justify-center w-7 h-7 text-amber-700 bg-amber-50 rounded-full border border-amber-200 cursor-help hover:bg-amber-100 transition-colors shadow-2xs">
+          <TrendingDown className="w-4 h-4" />
         </span>
       </Tooltip>
     );
@@ -139,13 +189,13 @@ const WeekStatusBadge: React.FC<{ week: InsightWeek }> = ({ week }) => {
     week.rate >= week.baseline.rate
   ) {
     const message = baselineRateStr
-      ? `Form rate (${currentRateStr}) meets or exceeds the 4-week baseline (${baselineRateStr}). Great performance!`
-      : "Form rate meets or exceeds the studio baseline.";
+      ? `Submission rate (${currentRateStr}) meets or exceeds the prior 4-week average baseline (${baselineRateStr}). Great performance!`
+      : "Submission rate meets or exceeds the studio baseline.";
 
     return (
       <Tooltip content={message}>
-        <span className="inline-flex items-center gap-1 text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 cursor-help">
-          <TrendingUp className="w-3.5 h-3.5" /> On Target
+        <span className="inline-flex items-center justify-center w-7 h-7 text-emerald-700 bg-emerald-50 rounded-full border border-emerald-200 cursor-help hover:bg-emerald-100 transition-colors shadow-2xs">
+          <TrendingUp className="w-4 h-4" />
         </span>
       </Tooltip>
     );
@@ -154,21 +204,21 @@ const WeekStatusBadge: React.FC<{ week: InsightWeek }> = ({ week }) => {
   if (!week.baseline) {
     return (
       <Tooltip content="Fewer than 8 first visits in the prior 4 weeks — not enough visit history to establish a reliable baseline.">
-        <span className="text-grey-2 font-semibold cursor-help border-b border-dashed border-grey-3">
-          No History
+        <span className="inline-flex items-center justify-center w-7 h-7 text-grey-3 bg-neutral-quaternary/40 rounded-full border border-neutral-tertiary cursor-help text-[11px] font-bold">
+          ?
         </span>
       </Tooltip>
     );
   }
 
   const normalMessage = baselineRateStr
-    ? `Form rate (${currentRateStr}) is within normal weekly expected range of the baseline (${baselineRateStr}).`
-    : "Form rate is within normal expected weekly variation.";
+    ? `Submission rate (${currentRateStr}) is within normal weekly expected range of the baseline (${baselineRateStr}).`
+    : "Submission rate is within normal expected weekly variation.";
 
   return (
     <Tooltip content={normalMessage}>
-      <span className="text-grey-2 font-semibold cursor-help border-b border-dashed border-grey-3">
-        Normal
+      <span className="inline-flex items-center justify-center w-7 h-7 text-grey-2 bg-neutral-quaternary/30 rounded-full border border-neutral-tertiary cursor-help hover:bg-neutral-quaternary/60 transition-colors text-[11px] font-bold">
+        —
       </span>
     </Tooltip>
   );
@@ -181,27 +231,60 @@ const WeeksTable: React.FC<{
   compact?: boolean;
 }> = ({ weeks, compact = false }) => {
   return (
-    <div className={`overflow-x-auto rounded-2xl border border-neutral-tertiary shadow-2xs ${compact ? "text-[11px]" : "text-xs"}`}>
+    <div
+      className={`overflow-x-auto rounded-2xl border border-neutral-tertiary shadow-2xs ${
+        compact ? "text-[11px]" : "text-xs"
+      }`}
+    >
       <table className="w-full text-left text-grey-5">
         <thead className="bg-neutral-quaternary/60 text-grey-2 font-bold uppercase tracking-wider border-b border-neutral-tertiary">
           <tr>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"}`}>Week</th>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>1st Visits</th>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>With Form</th>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>Forms Submitted</th>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>Rate</th>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>Baseline</th>
-            <th className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>Status</th>
+            <th className={`${compact ? "py-2.5 px-3" : "py-3 px-4"} whitespace-nowrap`}>
+              Week
+            </th>
+            <th
+              className={`${compact ? "py-2.5 px-2" : "py-3 px-3"} text-center whitespace-normal leading-tight max-w-[75px]`}
+            >
+              1st Visits
+            </th>
+            <th
+              className={`${compact ? "py-2.5 px-2" : "py-3 px-3"} text-center whitespace-normal leading-tight max-w-[80px]`}
+            >
+              With Form
+            </th>
+            <th
+              className={`${compact ? "py-2.5 px-2" : "py-3 px-3"} text-center whitespace-normal leading-tight max-w-[90px]`}
+            >
+              Forms Submitted
+            </th>
+            <th
+              className={`${compact ? "py-2.5 px-2" : "py-3 px-3"} text-center whitespace-normal leading-tight max-w-[100px]`}
+            >
+              Submission Rate
+            </th>
+            <th
+              className={`${compact ? "py-2.5 px-2" : "py-3 px-3"} text-center whitespace-normal leading-tight max-w-[140px]`}
+            >
+              Prior 4-week Average Submission Rate
+            </th>
+            <th
+              className={`${compact ? "py-2.5 px-2" : "py-3 px-3"} text-center whitespace-nowrap`}
+            >
+              Trend
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-tertiary bg-white">
           {weeks.map((week, idx) => (
             <tr
               key={idx}
-              className={`hover:bg-neutral-quaternary/40 transition-colors font-semibold ${idx % 2 === 1 ? "bg-neutral-quaternary/20" : ""
-                }`}
+              className={`hover:bg-neutral-quaternary/40 transition-colors font-semibold ${
+                idx % 2 === 1 ? "bg-neutral-quaternary/20" : ""
+              }`}
             >
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} font-bold text-dark-1 whitespace-nowrap`}>
+              <td
+                className={`${compact ? "py-2 px-3" : "py-3 px-4"} font-bold text-dark-1 whitespace-nowrap`}
+              >
                 {formatWeekRange(week.week_start, week.week_end)}
                 {!week.complete && (
                   <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-black uppercase bg-blue-100 text-blue-800 rounded-full border border-blue-200">
@@ -209,30 +292,46 @@ const WeeksTable: React.FC<{
                   </span>
                 )}
               </td>
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center font-bold text-dark-1`}>
+              <td
+                className={`${compact ? "py-2 px-2" : "py-3 px-3"} text-center font-bold text-dark-1`}
+              >
                 {week.first_visits}
               </td>
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center text-emerald-700 font-bold`}>
+              <td
+                className={`${compact ? "py-2 px-2" : "py-3 px-3"} text-center text-emerald-700 font-bold`}
+              >
                 {week.with_form}
               </td>
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center text-grey-2`}>
-                {week.forms_submitted !== week.with_form ? (
-                  <Tooltip
-                    content={`${week.forms_submitted} form${week.forms_submitted !== 1 ? "s" : ""} submitted, but only ${week.with_form} matched to a first visit by client ID.`}
+              <td
+                className={`${compact ? "py-2 px-2" : "py-3 px-3"} text-center text-grey-2`}
+              >
+                <Tooltip
+                  content={getFormsSubmittedTooltip(
+                    week.forms_submitted,
+                    week.with_form
+                  )}
+                >
+                  <span
+                    className={`cursor-help ${
+                      week.forms_submitted !== week.with_form
+                        ? "border-b border-dashed border-grey-5 font-bold text-dark-1"
+                        : ""
+                    }`}
                   >
-                    <span className="cursor-help border-b border-dashed border-grey-5">
-                      {week.forms_submitted}
-                    </span>
-                  </Tooltip>
-                ) : (
-                  <span>{week.forms_submitted}</span>
-                )}
+                    {week.forms_submitted}
+                  </span>
+                </Tooltip>
               </td>
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center font-black text-dark-1`}>
+              <td
+                className={`${compact ? "py-2 px-2" : "py-3 px-3"} text-center font-black text-dark-1`}
+              >
                 {pct(week.rate)}
               </td>
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center text-grey-2`}>
-                {week.baseline?.rate !== null && week.baseline?.rate !== undefined ? (
+              <td
+                className={`${compact ? "py-2 px-2" : "py-3 px-3"} text-center text-grey-2`}
+              >
+                {week.baseline?.rate !== null &&
+                week.baseline?.rate !== undefined ? (
                   <Tooltip
                     content={`Prior 4-week pooled baseline: ${pct(week.baseline.rate)} (${week.baseline.with_form} of ${week.baseline.first_visits} first visits with form).`}
                   >
@@ -248,7 +347,9 @@ const WeeksTable: React.FC<{
                   </Tooltip>
                 )}
               </td>
-              <td className={`${compact ? "py-2 px-3" : "py-3 px-4"} text-center`}>
+              <td
+                className={`${compact ? "py-2 px-2" : "py-3 px-3"} text-center`}
+              >
                 <WeekStatusBadge week={week} />
               </td>
             </tr>
@@ -259,11 +360,141 @@ const WeeksTable: React.FC<{
   );
 };
 
+/* ────────────────────── location visual trendline ────────────────────── */
+
+const LocationWeeklyTrendChart: React.FC<{ weeks: InsightWeek[] }> = ({ weeks }) => {
+  if (!weeks || weeks.length === 0) return null;
+
+  const chartData = weeks.map((w) => ({
+    weekLabel: formatWeekShort(w.week_start, w.week_end),
+    fullWeekRange: formatWeekRange(w.week_start, w.week_end),
+    rate: w.rate !== null && w.rate !== undefined ? Number(w.rate.toFixed(1)) : null,
+    baseline:
+      w.baseline?.rate !== null && w.baseline?.rate !== undefined
+        ? Number(w.baseline.rate.toFixed(1))
+        : null,
+    firstVisits: w.first_visits,
+    withForm: w.with_form,
+    formsSubmitted: w.forms_submitted,
+    complete: w.complete,
+  }));
+
+  return (
+    <div className="mb-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-neutral-tertiary shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-black text-dark-1">
+          <TrendingUp className="w-3.5 h-3.5 text-[#368591]" />
+          <span>Weekly Submission Rate vs. Prior 4-Week Average Baseline</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] font-bold text-grey-2">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#368591]" />
+            Submission Rate
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-0.5 border-b-2 border-dashed border-amber-500" />
+            Prior 4-Week Baseline
+          </span>
+        </div>
+      </div>
+      <div className="h-44 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 8, right: 16, left: -20, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+            <XAxis
+              dataKey="weekLabel"
+              tick={{ fontSize: 10, fill: "#6B7280", fontWeight: 600 }}
+              axisLine={{ stroke: "#E5E7EB" }}
+              tickLine={false}
+            />
+            <YAxis
+              domain={[0, 100]}
+              ticks={[0, 25, 50, 75, 100]}
+              tickFormatter={(v) => `${v}%`}
+              tick={{ fontSize: 10, fill: "#6B7280", fontWeight: 600 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <RechartsTooltip
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const d = payload[0]?.payload;
+                if (!d) return null;
+                return (
+                  <div className="bg-dark-1/95 text-white p-3 rounded-xl shadow-2xl border border-white/10 text-xs backdrop-blur-xs min-w-[210px]">
+                    <div className="font-extrabold text-white mb-2 pb-1.5 border-b border-white/10 flex items-center justify-between gap-2">
+                      <span>{d.fullWeekRange}</span>
+                      {!d.complete && (
+                        <span className="text-[9px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-black uppercase">
+                          In Progress
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#368591]" />
+                          Submission Rate:
+                        </span>
+                        <span className="font-bold text-white">
+                          {d.rate !== null ? `${d.rate}%` : "N/A"}
+                          <span className="text-zinc-400 font-normal ml-1">
+                            ({d.withForm}/{d.firstVisits})
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
+                          <span className="w-2.5 h-0.5 border-b-2 border-dashed border-amber-400" />
+                          Prior 4-wk Average:
+                        </span>
+                        <span className="font-bold text-amber-300">
+                          {d.baseline !== null ? `${d.baseline}%` : "No history"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 pt-1.5 border-t border-white/10 text-[11px] text-zinc-300">
+                        <span>Forms Submitted This Week:</span>
+                        <span className="font-bold text-white">{d.formsSubmitted}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="rate"
+              name="Submission Rate"
+              stroke="#368591"
+              strokeWidth={2.5}
+              dot={{ r: 3.5, fill: "#368591", strokeWidth: 0 }}
+              activeDot={{ r: 5, stroke: "#ffffff", strokeWidth: 2 }}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="baseline"
+              name="Prior 4-Week Average"
+              stroke="#F59E0B"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              dot={{ r: 3, fill: "#F59E0B", strokeWidth: 0 }}
+              activeDot={{ r: 4.5, stroke: "#ffffff", strokeWidth: 2 }}
+              connectNulls
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
 /* ────────────────────── expandable location card ────────────────────── */
 
 const LocationCard: React.FC<{
   loc: IntakeInsightsData["locations"][0];
-}> = ({ loc }) => {
+  globalMissingDates?: Set<string>;
+}> = ({ loc, globalMissingDates = new Set() }) => {
   const [expanded, setExpanded] = useState(false);
   const streak = loc.streak;
   const isRobotActive = loc.robot_selected !== false;
@@ -272,18 +503,21 @@ const LocationCard: React.FC<{
       ? `${streak.baseline.rate.toFixed(1)}%`
       : null;
 
-  // Count total missing days across all weeks
-  const totalMissing = loc.weeks.reduce(
-    (sum, w) => sum + (w.missing_days?.length || 0),
-    0
+  // Isolate missing days specific to this location vs. system-wide missing days
+  const locMissingDays = Array.from(
+    new Set(loc.weeks.flatMap((w) => w.missing_days || []))
+  );
+  const locationSpecificMissing = locMissingDays.filter(
+    (day) => !globalMissingDates.has(day)
   );
 
   return (
     <div
-      className={`rounded-2xl border overflow-hidden transition-all duration-200 ${!isRobotActive
-        ? "bg-zinc-50 border-zinc-200 opacity-70"
-        : "border-neutral-tertiary bg-white"
-        }`}
+      className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
+        !isRobotActive
+          ? "bg-zinc-50 border-zinc-200 opacity-70"
+          : "border-neutral-tertiary bg-white"
+      }`}
     >
       {/* Card header — clickable to expand */}
       <button
@@ -329,15 +563,24 @@ const LocationCard: React.FC<{
               )}
             </div>
 
-
-
-            {/* Data quality */}
-            {totalMissing > 0 && (
-              <div className="text-[10px] text-amber-700 flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3" />
-                {totalMissing} day{totalMissing > 1 ? "s" : ""} with missing data across reported weeks
+            {/* Studio-specific data quality */}
+            {locationSpecificMissing.length > 0 ? (
+              <div className="text-[10px] text-amber-700 flex items-center gap-1 font-bold">
+                <ShieldAlert className="w-3 h-3 text-amber-600 shrink-0" />
+                <span>
+                  {locationSpecificMissing.length} day{locationSpecificMissing.length > 1 ? "s" : ""} with missing data specific to this studio
+                </span>
               </div>
-            )}
+            ) : locMissingDays.length > 0 ? (
+              <Tooltip
+                content={`${locMissingDays.length} dates had un-synced visit records system-wide across reported weeks. There is no missing data specific to this studio.`}
+              >
+                <div className="text-[10px] text-grey-5 flex items-center gap-1 cursor-help font-medium">
+                  <Info className="w-3 h-3 text-grey-4 shrink-0" />
+                  <span>All data recorded for this studio ({locMissingDays.length} system-wide dates excluded)</span>
+                </div>
+              </Tooltip>
+            ) : null}
           </div>
         </div>
 
@@ -360,15 +603,23 @@ const LocationCard: React.FC<{
         </div>
       </button>
 
-      {/* Expandable weekly breakdown */}
+      {/* Expandable weekly breakdown: Visual Trendline + Data Table */}
       <div
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
-          }`}
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          expanded ? "max-h-[1600px] opacity-100" : "max-h-0 opacity-0"
+        }`}
       >
-        <div className="px-4 pb-4 pt-1 border-t border-neutral-tertiary bg-neutral-quaternary/20">
-          <h4 className="text-[10px] font-black uppercase tracking-wider text-grey-2 mb-2">
-            Weekly Breakdown — {loc.location_name}
-          </h4>
+        <div className="px-4 pb-4 pt-2 border-t border-neutral-tertiary bg-neutral-quaternary/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-grey-2">
+              Weekly Breakdown & Trendline — {loc.location_name}
+            </h4>
+          </div>
+
+          {/* Location Weekly Trendline */}
+          <LocationWeeklyTrendChart weeks={loc.weeks} />
+
+          {/* Location Weekly Breakdown Table */}
           <WeeksTable weeks={loc.weeks} compact />
         </div>
       </div>
@@ -460,6 +711,11 @@ const InsightsBody: React.FC<{
 }> = ({ insightsData, isLoading, isError, refetch }) => {
   const weeksList = insightsData?.totals?.weeks || [];
 
+  // Compute franchise / system-wide missing days
+  const globalMissingDates = new Set<string>(
+    weeksList.flatMap((w) => w.missing_days || [])
+  );
+
   if (isLoading) {
     return (
       <div className="py-20 flex flex-col items-center justify-center text-grey-5 space-y-3">
@@ -516,7 +772,7 @@ const InsightsBody: React.FC<{
           <h3 className="text-xs font-black uppercase tracking-wider text-grey-2">
             Weekly Intake Form Performance
           </h3>
-          <Tooltip content="Each week's form rate is compared against the 4-week baseline. 'Below' indicates completion dropped noticeably below normal studio baseline.">
+          <Tooltip content="Each week's submission rate is compared against the prior 4-week average baseline. Trend indicates if completion meets or dropped below the studio baseline.">
             <Info className="w-3.5 h-3.5 text-grey-5 cursor-help" />
           </Tooltip>
         </div>
@@ -531,13 +787,27 @@ const InsightsBody: React.FC<{
               <h3 className="text-xs font-black uppercase tracking-wider text-grey-2">
                 Location Streaks & Weekly Breakdown
               </h3>
-              <Tooltip content="Each location's current streak of first visits without an intake form. An 'Unusual' streak would happen less than 5% of the time at the location's own baseline rate. Click a card to see weekly details.">
+              <Tooltip content="Each location's current streak of first visits without an intake form. An 'Unusual' streak would happen less than 5% of the time at the location's own baseline rate. Click a card to see weekly details and visual trendlines.">
                 <Info className="w-3.5 h-3.5 text-grey-5 cursor-help" />
               </Tooltip>
             </div>
+
+            {globalMissingDates.size > 0 && (
+              <div className="mb-3 p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl text-xs text-amber-800 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1 text-[11px] leading-relaxed">
+                  <strong className="font-bold text-amber-900">Franchise Data Notice:</strong> Across the reported weeks, {globalMissingDates.size} date{globalMissingDates.size > 1 ? "s have" : " has"} un-synced visit records system-wide. Location cards below show only gaps specific to that studio.
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-3">
               {insightsData.locations.map((loc) => (
-                <LocationCard key={loc.location_id} loc={loc} />
+                <LocationCard
+                  key={loc.location_id}
+                  loc={loc}
+                  globalMissingDates={globalMissingDates}
+                />
               ))}
             </div>
           </div>

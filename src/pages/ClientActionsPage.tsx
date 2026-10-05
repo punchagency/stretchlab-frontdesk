@@ -76,9 +76,8 @@ export const ClientActionsPage = () => {
       if (res.status === "success") {
         const bookingsSummary = res.data.summary.bookings;
         const bookingsText = bookingsSummary
-          ? ` • Today's bookings: ${bookingsSummary.made_today || 0} made today, ${
-              bookingsSummary.removed || 0
-            } cancelled/moved`
+          ? ` • Today's bookings: ${bookingsSummary.made_today || 0} made today, ${bookingsSummary.removed || 0
+          } cancelled/moved`
           : "";
         setRefreshBanner({
           type: "success",
@@ -140,10 +139,10 @@ export const ClientActionsPage = () => {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-dark-1 tracking-tight">
-            Today's Critical Client Actions
+            Client Actions
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-grey-5 mt-1">
-            Prioritized arrival timeline and critical actions for today's booked sessions
+            Prioritized arrival timeline and  actions for booked sessions
           </p>
         </div>
 
@@ -184,13 +183,12 @@ export const ClientActionsPage = () => {
       {/* Live Refresh Outcome Banner */}
       {refreshBanner && (
         <div
-          className={`p-4 rounded-2xl border flex items-start justify-between gap-3 animate-in fade-in duration-200 text-xs ${
-            refreshBanner.type === "success"
+          className={`p-4 rounded-2xl border flex items-start justify-between gap-3 animate-in fade-in duration-200 text-xs ${refreshBanner.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-900"
               : refreshBanner.type === "warning"
-              ? "bg-amber-50 border-amber-300 text-amber-900"
-              : "bg-rose-50 border-rose-200 text-rose-900"
-          }`}
+                ? "bg-amber-50 border-amber-300 text-amber-900"
+                : "bg-rose-50 border-rose-200 text-rose-900"
+            }`}
         >
           <div className="flex items-start gap-2.5">
             {refreshBanner.type === "success" ? (
@@ -216,13 +214,12 @@ export const ClientActionsPage = () => {
                     return (
                       <div
                         key={idx}
-                        className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border flex flex-col gap-0.5 shadow-2xs ${
-                          allGood
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border flex flex-col gap-0.5 shadow-2xs ${allGood
                             ? "bg-white/90 border-emerald-300 text-emerald-950"
                             : allFailed
-                            ? "bg-white/90 border-rose-300 text-rose-950"
-                            : "bg-white/90 border-amber-300 text-amber-950"
-                        }`}
+                              ? "bg-white/90 border-rose-300 text-rose-950"
+                              : "bg-white/90 border-amber-300 text-amber-950"
+                          }`}
                       >
                         <span className="font-extrabold text-[11.5px]">{loc.location_name}</span>
                         <span className="text-[10px] text-grey-5 font-medium">
@@ -232,9 +229,8 @@ export const ClientActionsPage = () => {
                               {" "}
                               • Bookings:{" "}
                               {bkSuccess
-                                ? `${loc.bookings.made_today ?? 0} made today, ${
-                                    loc.bookings.removed ?? 0
-                                  } cancelled`
+                                ? `${loc.bookings.made_today ?? 0} made today, ${loc.bookings.removed ?? 0
+                                } cancelled`
                                 : loc.bookings.status}
                             </>
                           )}

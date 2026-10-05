@@ -80,7 +80,7 @@ export const KpiSummaryCard: React.FC<KpiSummaryCardProps> = ({
     <button
       type="button"
       onClick={onClick}
-      className={`p-5 min-h-[120px] rounded-2xl border text-left transition-all cursor-pointer shadow-2xs hover:shadow-sm flex flex-col justify-between ${
+      className={`p-3 sm:p-3.5 min-h-[76px] sm:min-h-[82px] rounded-2xl border text-left transition-all cursor-pointer shadow-2xs hover:shadow-sm flex flex-col justify-between ${
         isActive
           ? `${styles.activeBg} shadow-sm`
           : "bg-white border-neutral-tertiary hover:border-grey-2/50"
@@ -88,22 +88,22 @@ export const KpiSummaryCard: React.FC<KpiSummaryCardProps> = ({
     >
       <div className="flex items-center justify-between w-full">
         <span
-          className={`text-[11px] font-black uppercase tracking-wider ${styles.titleColor}`}
+          className={`text-[10px] font-black uppercase tracking-wider truncate pr-1 ${styles.titleColor}`}
         >
           {title}
         </span>
         <div
-          className={`w-8 h-8 rounded-xl flex items-center justify-center ${styles.iconBg}`}
+          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${styles.iconBg}`}
         >
-          <Icon className={`w-4 h-4 ${styles.iconColor}`} />
+          <Icon className={`w-3.5 h-3.5 ${styles.iconColor}`} />
         </div>
       </div>
-      <div className="mt-3 flex items-baseline gap-1.5 flex-wrap">
-        <span className={`text-2xl sm:text-3xl font-black ${styles.countColor}`}>
+      <div className="mt-1.5 flex items-baseline gap-1.5 flex-wrap">
+        <span className={`text-xl sm:text-2xl font-black ${styles.countColor}`}>
           {count}
         </span>
         {subText && (
-          <span className="text-[11px] text-grey-5 font-bold leading-tight">
+          <span className="text-[10px] text-grey-5 font-bold leading-tight truncate">
             {subText}
           </span>
         )}

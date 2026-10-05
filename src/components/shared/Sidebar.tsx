@@ -14,7 +14,7 @@ const noteAppURL = import.meta.env.VITE_REDIRECT_URL || "https://stretchnote.com
 
 const menuItems = [
   {
-    title: "Today's Actions",
+    title: "Client Actions",
     path: "/",
     icon: Target,
   },
