@@ -39,11 +39,11 @@ const menuItems = [
     path: "/review-inbox",
     icon: MessageSquare,
   },
-  // {
-  //   title: "Rewards",
-  //   path: "/rewards",
-  //   icon: MapPin,
-  // },
+  {
+    title: "Rewards",
+    path: "/rewards",
+    icon: MapPin,
+  },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
