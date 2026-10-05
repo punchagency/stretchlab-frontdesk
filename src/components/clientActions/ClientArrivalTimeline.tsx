@@ -3,7 +3,11 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react";
-import { ClientActionRow, actionRowKey } from "../../service/clientActions";
+import {
+  ClientActionRow,
+  ActionEntry,
+  actionRowKey,
+} from "../../service/clientActions";
 import { ClientArrivalCard } from "./ClientArrivalCard";
 import { ClientActionsPagination } from "./ClientActionsPagination";
 
@@ -14,6 +18,11 @@ interface ClientArrivalTimelineProps {
   onGoalClick: (row: ClientActionRow) => void;
   onToggleFollowUp: (row: ClientActionRow) => void;
   onOpenNoteDrawer: (row: ClientActionRow) => void;
+  onLogMaps?: (row: ClientActionRow) => void;
+  onLogBookNext?: (row: ClientActionRow, count?: number) => void;
+  onUndoAction?: (entry: ActionEntry) => void;
+  isLoggingAction?: boolean;
+  undoingEntryId?: number | null;
   togglingRowKey: string | null;
   copiedId: string | null;
   onCopyId: (id: string, e: React.MouseEvent) => void;
@@ -54,6 +63,11 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   onGoalClick,
   onToggleFollowUp,
   onOpenNoteDrawer,
+  onLogMaps,
+  onLogBookNext,
+  onUndoAction,
+  isLoggingAction,
+  undoingEntryId,
   togglingRowKey,
   copiedId,
   onCopyId,
@@ -301,7 +315,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                   ) : (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>All Clear</span>
+                      <span>No Actions Needed</span>
                     </span>
                   )}
                 </div>
@@ -322,6 +336,11 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                       onGoalClick={onGoalClick}
                       onToggleFollowUp={onToggleFollowUp}
                       onOpenNoteDrawer={onOpenNoteDrawer}
+                      onLogMaps={onLogMaps}
+                      onLogBookNext={onLogBookNext}
+                      onUndoAction={onUndoAction}
+                      isLoggingAction={isLoggingAction}
+                      undoingEntryId={undoingEntryId}
                       isToggling={isToggling}
                       copiedId={copiedId}
                       onCopyId={onCopyId}

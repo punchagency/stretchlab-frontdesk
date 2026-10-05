@@ -11,8 +11,16 @@ import {
   MessageSquare,
   MapPin,
   Clock,
+  Target,
+  CalendarDays,
+  Sparkles,
+  Undo2,
 } from "lucide-react";
-import { ClientActionRow } from "../../service/clientActions";
+import {
+  ClientActionRow,
+  ActionEntry,
+  toBook,
+} from "../../service/clientActions";
 import { ActionBadgeChip } from "./ActionBadgeChip";
 import {
   Tooltip,
@@ -21,11 +29,16 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 
-interface ClientArrivalCardProps {
+export interface ClientArrivalCardProps {
   row: ClientActionRow;
   onGoalClick: (row: ClientActionRow) => void;
   onToggleFollowUp: (row: ClientActionRow) => void;
   onOpenNoteDrawer: (row: ClientActionRow) => void;
+  onLogMaps?: (row: ClientActionRow) => void;
+  onLogBookNext?: (row: ClientActionRow, count?: number) => void;
+  onUndoAction?: (entry: ActionEntry) => void;
+  isLoggingAction?: boolean;
+  undoingEntryId?: number | null;
   isToggling: boolean;
   copiedId: string | null;
   onCopyId: (id: string, e: React.MouseEvent) => void;
@@ -41,11 +54,164 @@ const getInitials = (name?: string | null) => {
   return name.slice(0, 2).toUpperCase();
 };
 
+const formatUtcTime = (stamp?: string | null) => {
+  if (!stamp) return "";
+  try {
+    const d = new Date(stamp.endsWith("Z") ? stamp : stamp + "Z");
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return stamp;
+  }
+};
+
+const formatGoalSource = (source?: string | null): string => {
+  if (!source) return "";
+  switch (source) {
+    case "intake":
+      return "intake form";
+    case "note":
+      return "session note";
+    case "front_desk":
+      return "front desk";
+    default:
+      return source.replace(/_/g, " ");
+  }
+};
+
+const ActionsTakenList: React.FC<{
+  actions?: ActionEntry[] | null;
+  onUndoAction?: (entry: ActionEntry) => void;
+  undoingEntryId?: number | null;
+}> = ({ actions, onUndoAction, undoingEntryId }) => {
+  if (!actions || actions.length === 0) return null;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-neutral-tertiary/60 flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+        Logged:
+      </span>
+      {actions.map((entry) => {
+        const isUndoable =
+          entry.action === "maps" || entry.action === "book_next";
+        const timeStr = entry.done_at ? formatUtcTime(entry.done_at) : "";
+        const staffName = entry.staff_name || entry.done_by_name || "Desk";
+        const checkStatus = entry.check?.status || "pending";
+
+        let statusBadge = null;
+        if (checkStatus === "confirmed") {
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <Check className="w-2.5 h-2.5" /> Confirmed
+            </span>
+          );
+        } else if (checkStatus === "pending") {
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+              Checking…
+            </span>
+          );
+        } else if (checkStatus === "not_confirmed") {
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+              Not Confirmed
+            </span>
+          );
+        } else {
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">
+              Manual
+            </span>
+          );
+        }
+
+        const actionName =
+          entry.action === "maps"
+            ? "MAPS"
+            : entry.action === "book_next"
+            ? `Booked ${(entry.check?.evidence as any)?.claimed ?? (entry.check?.evidence as any)?.found ?? entry.booked_count ?? ""}`
+            : entry.action === "intake_form"
+            ? "Intake Form"
+            : "Goal";
+
+        return (
+          <TooltipProvider key={entry.id} delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-neutral-quaternary border border-neutral-tertiary">
+                  <span className="font-bold text-dark-1">{actionName}</span>
+                  {statusBadge}
+                  <span className="text-[10px] text-grey-5 font-normal">
+                    {staffName} {timeStr}
+                  </span>
+                  {isUndoable && onUndoAction && (
+                    <button
+                      type="button"
+                      disabled={undoingEntryId === entry.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUndoAction(entry);
+                      }}
+                      className="ml-0.5 p-0.5 text-zinc-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                      title="Undo this action log"
+                    >
+                      {undoingEntryId === entry.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
+                      ) : (
+                        <Undo2 className="w-3 h-3" />
+                      )}
+                    </button>
+                  )}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-xs space-y-1">
+                <p className="font-bold text-[11px]">
+                  {actionName} logged by {staffName}
+                </p>
+                {entry.note && (
+                  <p className="italic text-zinc-300">"{entry.note}"</p>
+                )}
+                {entry.action === "book_next" && (entry.check?.evidence as any)?.found != null && (
+                  <p className="text-[10px] text-zinc-300">
+                    {(entry.check?.evidence as any)?.claimed != null && `Claimed: ${(entry.check?.evidence as any).claimed} · `}
+                    Found: {(entry.check?.evidence as any).found} appointment{((entry.check?.evidence as any).found === 1 ? "" : "s")}
+                    {(entry.check?.evidence as any).found_bookings != null && (entry.check?.evidence as any).found_bookings !== (entry.check?.evidence as any).found && (
+                      <span className="text-zinc-400"> ({(entry.check?.evidence as any).found_bookings} bookings)</span>
+                    )}
+                  </p>
+                )}
+                {entry.check?.reason && (
+                  <p className="text-[10px] text-zinc-300 capitalize">
+                    Reason: {entry.check.reason.replace(/_/g, " ")}
+                  </p>
+                )}
+                {checkStatus === "pending" && (
+                  <p className="text-[9px] text-zinc-400">
+                    Normal on the day. Robot verifies overnight or at daytime run.
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      })}
+    </div>
+  );
+};
+
 export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   row,
   onGoalClick,
   onToggleFollowUp,
   onOpenNoteDrawer,
+  onLogMaps,
+  onLogBookNext,
+  onUndoAction,
+  isLoggingAction,
+  undoingEntryId,
   isToggling,
   copiedId,
   onCopyId,
@@ -55,6 +221,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   const isFollowUpChecked = Boolean(row.intake?.follow_up?.checked);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
   const hasActions = row.badges.length > 0;
+  const neededBookings = toBook(row) ?? 1;
 
   return (
     <div
@@ -93,7 +260,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
                 {row.client_name || "Unknown Client"}
               </span>
 
-              {/* Arrival time pill (e.g. 1:30 PM - 1:55 PM) in light mode */}
+              {/* Arrival time pill (e.g. 1:30 PM - 1:55 PM) */}
               {(row.booking_start || row.booking_end) && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-neutral-quaternary text-dark-1 border border-neutral-tertiary text-[11px] font-black shadow-2xs">
                   <Clock className="w-3 h-3 text-primary-base" />
@@ -195,23 +362,79 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
           <div className="flex flex-wrap items-center gap-1.5">
             {row.badges.length === 0 ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span>✓ All Clear</span>
+                <span>✓ No Action Needed</span>
               </span>
             ) : (
-              row.badges.map((badgeKey) => (
-                <ActionBadgeChip
-                  key={badgeKey}
-                  badgeKey={badgeKey}
-                  row={row}
-                  onGoalClick={onGoalClick}
-                  onToggleFollowUp={onToggleFollowUp}
-                />
-              ))
+              <>
+                <span className="text-[11px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+                  Must Get:
+                </span>
+                {row.badges.map((badgeKey) => (
+                  <ActionBadgeChip
+                    key={badgeKey}
+                    badgeKey={badgeKey}
+                    row={row}
+                    onGoalClick={onGoalClick}
+                    onToggleFollowUp={onToggleFollowUp}
+                    onLogMaps={onLogMaps}
+                    onLogBookNext={onLogBookNext}
+                  />
+                ))}
+              </>
             )}
           </div>
 
           {/* Quick Action Buttons Group */}
           <div className="flex items-center gap-1.5 shrink-0 pl-1 border-l border-neutral-tertiary/70">
+            {/* Quick 1-click MAPS Log */}
+            {row.badges.includes("maps_due") && onLogMaps && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={isLoggingAction}
+                      onClick={() => onLogMaps(row)}
+                      className="px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Target className="w-3.5 h-3.5 text-slate-300" />
+                      <span>Log MAPS</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <p className="font-semibold text-[11px]">
+                      Mark MAPS Assessment Completed
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Quick 1-click Book Next Log */}
+            {row.badges.includes("future_bookings_below_target") &&
+              onLogBookNext && (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={isLoggingAction}
+                        onClick={() => onLogBookNext(row, neededBookings)}
+                        className="px-2.5 py-1.5 rounded-xl border border-indigo-700 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <CalendarDays className="w-3.5 h-3.5 text-indigo-200" />
+                        <span>Log Booked ({neededBookings})</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-semibold text-[11px]">
+                        Mark {neededBookings} upcoming session(s) booked
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
             {row.clubready_user_id && (
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
@@ -324,6 +547,48 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Goal & Why Preview */}
+      {(row.goal?.goal || row.goal?.why) && (
+        <div className="mt-3 pt-2.5 border-t border-neutral-tertiary/60 text-xs space-y-1">
+          {row.goal.goal && (
+            <div className="flex items-start gap-1.5 text-zinc-700">
+              <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0 mt-0.5" />
+              <span className="font-black text-dark-1 text-[11px]">Goal:</span>
+              <span className="italic text-[11px] text-zinc-800 font-semibold">
+                "{row.goal.goal}"
+              </span>
+              {row.goal.days_since !== null && (
+                <span className="text-[10px] text-zinc-400 font-normal shrink-0">
+                  ({row.goal.days_since}d ago)
+                </span>
+              )}
+            </div>
+          )}
+          {row.goal.why && (
+            <div className="flex items-start gap-1.5 pl-5 text-[11px] leading-snug">
+              <span className="font-bold text-purple-900 shrink-0">Why:</span>
+              <div className="min-w-0 flex-1">
+                <span className="italic text-zinc-700 font-medium">
+                  "{row.goal.why}"
+                </span>
+                {row.goal.why_source && (
+                  <span className="text-[10px] text-zinc-400 font-normal ml-1 inline-block">
+                    · from {formatGoalSource(row.goal.why_source)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions Taken Audit & Verification Bar */}
+      <ActionsTakenList
+        actions={row.actions_taken}
+        onUndoAction={onUndoAction}
+        undoingEntryId={undoingEntryId}
+      />
     </div>
   );
 };
@@ -333,6 +598,11 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   onGoalClick,
   onToggleFollowUp,
   onOpenNoteDrawer,
+  onLogMaps,
+  onLogBookNext,
+  onUndoAction,
+  isLoggingAction,
+  undoingEntryId,
   isToggling,
   copiedId,
   onCopyId,
@@ -342,6 +612,7 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   const isFollowUpChecked = Boolean(row.intake?.follow_up?.checked);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
   const hasActions = row.badges.length > 0;
+  const neededBookings = toBook(row) ?? 1;
 
   return (
     <div
@@ -468,38 +739,108 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
         </div>
       </div>
 
+      {/* Goal & Why Preview */}
+      {(row.goal?.goal || row.goal?.why) && (
+        <div className="pt-2.5 pb-0.5 border-t border-neutral-tertiary/60 text-xs space-y-1.5">
+          {row.goal.goal && (
+            <div className="flex items-start gap-1.5 text-zinc-700">
+              <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1 leading-snug">
+                <span className="font-black text-dark-1 text-[11px] mr-1">Goal:</span>
+                <span className="italic text-[11px] text-zinc-800 font-semibold">
+                  "{row.goal.goal}"
+                </span>
+                {row.goal.days_since !== null && (
+                  <span className="text-[10px] text-zinc-400 font-normal ml-1 shrink-0">
+                    ({row.goal.days_since}d ago)
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          {row.goal.why && (
+            <div className="flex items-start gap-1.5 pl-5 text-[11px] leading-snug">
+              <span className="font-bold text-purple-900 shrink-0">Why:</span>
+              <div className="min-w-0 flex-1">
+                <span className="italic text-zinc-700 font-medium">
+                  "{row.goal.why}"
+                </span>
+                {row.goal.why_source && (
+                  <span className="text-[10px] text-zinc-400 font-normal ml-1 inline-block">
+                    · from {formatGoalSource(row.goal.why_source)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Critical Action Badges */}
       <div className="pt-2 border-t border-neutral-tertiary/60 min-h-[44px] flex items-center">
         <div className="flex flex-wrap items-center gap-1.5 w-full">
           {row.badges.length === 0 ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span>✓ All Clear</span>
+              <span>✓ No Action Needed</span>
             </span>
           ) : (
-            row.badges.map((badgeKey) => (
-              <ActionBadgeChip
-                key={badgeKey}
-                badgeKey={badgeKey}
-                row={row}
-                onGoalClick={onGoalClick}
-                onToggleFollowUp={onToggleFollowUp}
-              />
-            ))
+            <>
+              <span className="text-[11px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+                Must Get:
+              </span>
+              {row.badges.map((badgeKey) => (
+                <ActionBadgeChip
+                  key={badgeKey}
+                  badgeKey={badgeKey}
+                  row={row}
+                  onGoalClick={onGoalClick}
+                  onToggleFollowUp={onToggleFollowUp}
+                  onLogMaps={onLogMaps}
+                  onLogBookNext={onLogBookNext}
+                />
+              ))}
+            </>
           )}
         </div>
       </div>
 
-      {/* Footer: Quick Action Buttons */}
-      <div className="pt-3 border-t border-neutral-tertiary/60 flex items-center justify-between">
-        <span className="text-[11px] font-bold text-grey-5">
-          {hasActions
-            ? `${row.badges.length} action${
-                row.badges.length === 1 ? "" : "s"
-              }`
-            : "All Done"}
-        </span>
+      {/* Actions Taken Audit & Verification Bar */}
+      <ActionsTakenList
+        actions={row.actions_taken}
+        onUndoAction={onUndoAction}
+        undoingEntryId={undoingEntryId}
+      />
 
+      {/* Footer: Quick Action Buttons */}
+      <div className="pt-3 border-t border-neutral-tertiary/60 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5">
+          {row.badges.includes("maps_due") && onLogMaps && (
+            <button
+              type="button"
+              disabled={isLoggingAction}
+              onClick={() => onLogMaps(row)}
+              className="px-2 py-1 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1 disabled:opacity-50"
+            >
+              <Target className="w-3 h-3 text-slate-300" />
+              <span>Log MAPS</span>
+            </button>
+          )}
+
+          {row.badges.includes("future_bookings_below_target") &&
+            onLogBookNext && (
+              <button
+                type="button"
+                disabled={isLoggingAction}
+                onClick={() => onLogBookNext(row, neededBookings)}
+                className="px-2 py-1 rounded-xl border border-indigo-700 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1 disabled:opacity-50"
+              >
+                <CalendarDays className="w-3 h-3 text-indigo-200" />
+                <span>Log Booked ({neededBookings})</span>
+              </button>
+            )}
+        </div>
+
+        <div className="flex items-center gap-1.5 ml-auto">
           {row.clubready_user_id && (
             <TooltipProvider delayDuration={150}>
               <Tooltip>
@@ -614,3 +955,4 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
     </div>
   );
 };
+

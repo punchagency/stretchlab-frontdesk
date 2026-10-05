@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -19,12 +19,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
+  Legend,
   Tooltip as RechartsTooltip,
 } from "recharts";
 import {
@@ -43,59 +44,24 @@ const DURATION_OPTIONS: DurationOption[] = [
   { value: "custom", label: "Custom Range" },
 ];
 
-const CustomBar = (props: any) => {
-  const { payload, x, y, width, height } = props;
 
-  if (
-    !payload ||
-    typeof payload.value !== "number" ||
-    isNaN(payload.value) ||
-    typeof x !== "number" ||
-    isNaN(x) ||
-    typeof y !== "number" ||
-    isNaN(y) ||
-    typeof width !== "number" ||
-    isNaN(width) ||
-    typeof height !== "number" ||
-    isNaN(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return <g />;
-  }
-
-  const brickHeight = 20;
-  const numBricks = Math.floor(height / brickHeight);
-
-  const bricks = [];
-  for (let i = 0; i < numBricks; i++) {
-    const brickY = y + height - (i + 1) * brickHeight;
-    const gradientId = `intakeBrickGradient-${i}-${x}`;
-
-    bricks.push(
-      <g key={`brick-${i}`}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="100%">
-            <stop offset="0%" stopColor="#368591" />
-            <stop offset="30%" stopColor="#368591" />
-            <stop offset="100%" stopColor="#368591" stopOpacity="0.75" />
-          </linearGradient>
-        </defs>
-        <rect
-          x={x}
-          y={brickY}
-          width={width}
-          height={brickHeight}
-          fill={`url(#${gradientId})`}
-        />
-      </g>
-    );
-  }
-
+const CustomizedAxisTick = (props: any) => {
+  const { x, y, payload } = props;
   return (
-    <g>
-      <rect x={x} y={y} width={width} height={height} fill="transparent" />
-      {bricks}
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={14}
+        dx={-4}
+        textAnchor="end"
+        fill="#334155"
+        fontSize={12.5}
+        fontWeight={700}
+        transform="rotate(-30)"
+      >
+        {payload.value}
+      </text>
     </g>
   );
 };
@@ -111,19 +77,28 @@ const CustomTooltip = ({ active, payload }: any) => {
         </p>
         <div className="space-y-1.5 text-grey-5">
           <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
-            <span className="font-semibold text-grey-5">Intake Submission Rate:</span>
-            <span className="font-black text-primary-base text-xs">
+            <span className="font-semibold text-dark-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#368591] shrink-0"></span>
+              Intake Submission Rate:
+            </span>
+            <span className="font-black text-[#368591] text-xs">
               {data.intake_form_submission_rate}%
             </span>
           </div>
           <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
-            <span className="font-semibold text-emerald-700">Conversion (With Intake):</span>
+            <span className="font-semibold text-dark-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0"></span>
+              Conversion (With Intake):
+            </span>
             <span className="font-black text-emerald-600 text-xs">
               {data.conversion_rate_with_intake_form}%
             </span>
           </div>
           <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
-            <span className="font-semibold text-amber-700">Conversion (No Intake):</span>
+            <span className="font-semibold text-dark-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-600 shrink-0"></span>
+              Conversion (No Intake):
+            </span>
             <span className="font-black text-amber-600 text-xs">
               {data.conversion_rate_without_intake_form}%
             </span>
@@ -161,6 +136,18 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
   const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(
     null
   );
+  const [isSmallScreen, setIsSmallScreen] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth < 1024 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSmallScreen(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const { data: homeData } = useQuery({
     queryKey: ["frontdeskHomeLocations"],
@@ -209,7 +196,7 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
         loc.first_visits > 0 || loc.intake_form_submissions > 0
     )
     .map((loc: IntakeFormLocation) => ({
-      name: loc.location_name,
+      name: loc.location_name.replace(/^StretchLab\s+/i, ""),
       location_name: loc.location_name,
       intake_form_submission_rate: loc.intake_form_submission_rate ?? loc.conversion_percentage ?? 0,
       conversion_rate_with_intake_form: loc.conversion_rate_with_intake_form ?? loc.matched_conversion_percentage ?? 0,
@@ -502,52 +489,93 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
           </TooltipProvider>
 
 
-          {chartData.length > 0 && (
+          {chartData.length > 0 ? (
             <div className="bg-white p-6 rounded-3xl border border-neutral-tertiary shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-neutral-tertiary/60 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-tertiary/60 pb-4">
                 <div>
                   <h3 className="text-base font-black text-dark-1">
-                    Conversion Rate by Studio Location
+                    Intake &amp; Conversion Performance by Studio Location
                   </h3>
                   <p className="text-grey-5 text-xs mt-0.5">
-                    Percentage of first-time visits matched to digital intake forms per location.
+                    Multi-metric comparison of intake submission rate vs. conversion rate with and without intake forms across locations.
                   </p>
                 </div>
               </div>
 
-              <div className="h-[380px] w-full pt-2">
+              <div className="h-[480px] w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
+                  <LineChart
                     data={chartData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
-                    barCategoryGap="5%"
+                    margin={{
+                      top: 15,
+                      right: isSmallScreen ? 15 : 30,
+                      left: isSmallScreen ? 15 : 30,
+                      bottom: 75,
+                    }}
                   >
-                    <CartesianGrid stroke="none" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis
                       dataKey="name"
-                      axisLine={false}
+                      interval={isSmallScreen ? "preserveEnd" : 0}
+                      tick={<CustomizedAxisTick />}
+                      height={70}
                       tickLine={false}
-                      tick={{ fill: "#6b7280", fontSize: 12, fontWeight: 600 }}
+                      axisLine={{ stroke: "#e2e8f0" }}
                     />
                     <YAxis
+                      domain={[0, 100]}
+                      unit="%"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: "#6b7280", fontSize: 12, fontWeight: 600 }}
-                      width={35}
+                      tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }}
+                      width={42}
                     />
                     <RechartsTooltip
-                      cursor={{ fill: "rgba(0,0,0,0.03)" }}
+                      cursor={{ stroke: "#cbd5e1", strokeWidth: 1, strokeDasharray: "3 3" }}
                       content={<CustomTooltip />}
                     />
-                    <Bar
-                      dataKey="value"
-                      fill="#368591"
-                      maxBarSize={550}
-                      shape={<CustomBar />}
+                    <Legend
+                      verticalAlign="top"
+                      align="right"
+                      iconType="circle"
+                      wrapperStyle={{ paddingBottom: 16, fontSize: 12, fontWeight: 700 }}
                     />
-                  </BarChart>
+                    <Line
+                      type="monotone"
+                      dataKey="intake_form_submission_rate"
+                      name="Intake Submission Rate"
+                      stroke="#368591"
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: "#368591", strokeWidth: 2, stroke: "#ffffff" }}
+                      activeDot={{ r: 8, stroke: "#368591", strokeWidth: 2 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="conversion_rate_with_intake_form"
+                      name="Conversion (w/ Intake)"
+                      stroke="#059669"
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: "#059669", strokeWidth: 2, stroke: "#ffffff" }}
+                      activeDot={{ r: 8, stroke: "#059669", strokeWidth: 2 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="conversion_rate_without_intake_form"
+                      name="Conversion (w/out Intake)"
+                      stroke="#d97706"
+                      strokeWidth={2.5}
+                      strokeDasharray="4 4"
+                      dot={{ r: 4.5, fill: "#d97706", strokeWidth: 2, stroke: "#ffffff" }}
+                      activeDot={{ r: 7, stroke: "#d97706", strokeWidth: 2 }}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          ) : (
+            <div className="bg-white p-8 rounded-3xl border border-neutral-tertiary shadow-xs text-center space-y-1.5">
+              <p className="text-sm font-black text-dark-1">No Studio Performance Data Available</p>
+              <p className="text-xs text-grey-5">There are no visits or intake submissions recorded for the selected filter range.</p>
             </div>
           )}
 

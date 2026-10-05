@@ -135,14 +135,18 @@ export interface FollowUpResponse {
   };
 }
 
-export const checkFollowUp = async (visit: VisitKey, note?: string) => {
-  const payload = note === undefined ? visit : { ...visit, note };
+export const checkFollowUp = async (visit: VisitKey, note?: string, staffId?: number) => {
+  const payload: any = { ...visit };
+  if (note !== undefined) payload.note = note;
+  if (staffId !== undefined) payload.staff_id = staffId;
   const response = await api.post<FollowUpResponse>("/frontdesk/follow-ups/check", payload);
   return response.data;
 };
 
-export const uncheckFollowUp = async (visit: VisitKey) => {
-  const response = await api.post<FollowUpResponse>("/frontdesk/follow-ups/uncheck", visit);
+export const uncheckFollowUp = async (visit: VisitKey, staffId?: number) => {
+  const payload: any = { ...visit };
+  if (staffId !== undefined) payload.staff_id = staffId;
+  const response = await api.post<FollowUpResponse>("/frontdesk/follow-ups/uncheck", payload);
   return response.data;
 };
 
