@@ -139,6 +139,7 @@ export const Home = () => {
     data: homeData,
     isLoading,
     isError,
+    error: homeError,
     isRefetching,
     refetch,
   } = useQuery({
@@ -147,7 +148,30 @@ export const Home = () => {
       const response = await getFrontdeskHome(homeQueryParams);
       return response.data?.data;
     },
+    retry: (failureCount, err: any) => {
+      // Do not retry on 403 (all locations removed from studio or not authorized)
+      if (err?.response?.status === 403) return false;
+      return failureCount < 2;
+    },
   });
+
+  const homeErrorMessage =
+    (homeError as any)?.response?.data?.message ||
+    (homeError as any)?.response?.data?.error ||
+    "";
+  const isLocationsRemovedLockout =
+    (homeError as any)?.response?.status === 403 &&
+    homeErrorMessage.toLowerCase().includes("none of your locations");
+  const isStaleLocationError =
+    (homeError as any)?.response?.status === 403 &&
+    homeErrorMessage.toLowerCase().includes("location is not one of your locations");
+
+  useEffect(() => {
+    if (isStaleLocationError && selectedLocation) {
+      setSelectedLocation("");
+      renderErrorToast("Your location access has changed. Updating view...");
+    }
+  }, [isStaleLocationError, selectedLocation]);
 
   const [statusFilter, setStatusFilter] = useState<"all" | "missing" | "completed">("all");
   const [showCustomDatePicker, setShowCustomDatePicker] = useState<boolean>(false);
@@ -1606,9 +1630,26 @@ export const Home = () => {
                   Loading data feed...
                 </p>
               </div>
+            ) : isLocationsRemovedLockout ? (
+              <div className="py-16 px-6 flex flex-col items-center justify-center text-center max-w-lg mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center shadow-xs">
+                  <AlertTriangle className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-dark-1 tracking-tight">
+                    Location Access Revoked
+                  </h3>
+                  <p className="text-xs text-red-600 mt-2 font-semibold leading-relaxed">
+                    {homeErrorMessage}
+                  </p>
+                  <p className="text-xs text-grey-5 mt-3 leading-relaxed">
+                    Every location you were assigned has been removed from this studio. Please contact your studio owner or manager to update your assigned locations in the admin dashboard.
+                  </p>
+                </div>
+              </div>
             ) : isError ? (
               <ErrorHandle
-                message="Failed to load frontdesk data feed."
+                message={homeErrorMessage || "Failed to load frontdesk data feed."}
                 retry={() => refetch()}
               />
             ) : subView === "first_timers" ? (

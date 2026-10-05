@@ -151,7 +151,29 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       getClientActions(selectedDate, selectedLocation || undefined),
     staleTime: 3 * 60 * 1000,
     refetchOnWindowFocus: true,
+    retry: (failureCount, err: any) => {
+      if (err?.response?.status === 403) return false;
+      return failureCount < 2;
+    },
   });
+
+  const actionsErrorMessage =
+    (error as any)?.response?.data?.message ||
+    (error as any)?.response?.data?.error ||
+    "";
+  const isLocationsRemovedLockout =
+    (error as any)?.response?.status === 403 &&
+    actionsErrorMessage.toLowerCase().includes("none of your locations");
+  const isStaleLocationError =
+    (error as any)?.response?.status === 403 &&
+    actionsErrorMessage.toLowerCase().includes("location is not one of your locations");
+
+  useEffect(() => {
+    if (isStaleLocationError && selectedLocation) {
+      setSelectedLocation("");
+      renderErrorToast("Your location access has changed. Updating view...");
+    }
+  }, [isStaleLocationError, selectedLocation]);
 
   const actionsData = clientActionsResponse?.data;
   const windowData = actionsData?.window;
@@ -833,7 +855,24 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       </div>
 
       {/* Main Content: Chronological Arrival Timeline OR Action Cards Grid */}
-      {isError ? (
+      {isLocationsRemovedLockout ? (
+        <div className="bg-white rounded-3xl border border-rose-200 shadow-xs p-12 text-center max-w-lg mx-auto space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto shadow-xs">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <div>
+            <h4 className="text-base font-black text-dark-1">
+              Location Access Revoked
+            </h4>
+            <p className="text-xs text-rose-600 mt-2 font-semibold leading-relaxed">
+              {actionsErrorMessage}
+            </p>
+            <p className="text-xs text-grey-5 mt-3 leading-relaxed">
+              Every location you were assigned has been removed from this studio. Please contact your studio owner or manager to update your assigned locations in the admin dashboard.
+            </p>
+          </div>
+        </div>
+      ) : isError ? (
         <div className="bg-white rounded-3xl border border-neutral-tertiary shadow-xs p-8 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
             <AlertCircle className="w-6 h-6" />
@@ -842,7 +881,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             Failed to Load Client Actions
           </h4>
           <p className="text-xs text-grey-5 max-w-md mx-auto">
-            {(error as any)?.response?.data?.message ||
+            {actionsErrorMessage ||
               "Unable to fetch client action bookings for this date."}
           </p>
           <button
