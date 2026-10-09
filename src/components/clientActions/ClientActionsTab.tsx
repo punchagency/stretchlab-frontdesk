@@ -149,7 +149,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     ],
     queryFn: () =>
       getClientActions(selectedDate, selectedLocation || undefined),
-    staleTime: 3 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: (failureCount, err: any) => {
       if (err?.response?.status === 403) return false;
@@ -755,8 +755,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             type="button"
             onClick={() => handleBadgeFilterChange("with_goals")}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${badgeFilter === "with_goals"
-                ? "bg-purple-700 text-white shadow-2xs font-extrabold"
-                : "bg-white text-purple-900 border border-purple-200 hover:bg-purple-100/60"
+              ? "bg-purple-700 text-white shadow-2xs font-extrabold"
+              : "bg-white text-purple-900 border border-purple-200 hover:bg-purple-100/60"
               }`}
           >
             With Goals
@@ -767,8 +767,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
               type="button"
               onClick={() => handleBadgeFilterChange("goal_missing")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${badgeFilter === "goal_missing"
-                  ? "bg-purple-700 text-white shadow-2xs font-extrabold"
-                  : "bg-white text-purple-900 border border-purple-200 hover:bg-purple-100/60"
+                ? "bg-purple-700 text-white shadow-2xs font-extrabold"
+                : "bg-white text-purple-900 border border-purple-200 hover:bg-purple-100/60"
                 }`}
             >
               Goal Missing
@@ -780,8 +780,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
               type="button"
               onClick={() => handleBadgeFilterChange("goal_update_due")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${badgeFilter === "goal_update_due"
-                  ? "bg-amber-600 text-white shadow-2xs font-extrabold"
-                  : "bg-white text-amber-900 border border-amber-200 hover:bg-amber-100/60"
+                ? "bg-amber-600 text-white shadow-2xs font-extrabold"
+                : "bg-white text-amber-900 border border-amber-200 hover:bg-amber-100/60"
                 }`}
             >
               Goal Due (90d+)
@@ -816,8 +816,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
               )
             }
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${badgeFilter === "no_actions"
-                ? "bg-emerald-600 text-white shadow-2xs font-extrabold"
-                : "bg-emerald-50/80 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+              ? "bg-emerald-600 text-white shadow-2xs font-extrabold"
+              : "bg-emerald-50/80 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
               }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -831,8 +831,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             type="button"
             onClick={() => setViewMode("timeline")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${viewMode === "timeline"
-                ? "bg-white text-primary-base shadow-2xs font-black"
-                : "text-grey-5 hover:text-dark-1"
+              ? "bg-white text-primary-base shadow-2xs font-black"
+              : "text-grey-5 hover:text-dark-1"
               }`}
             title="Arrival Timeline View"
           >
@@ -843,8 +843,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             type="button"
             onClick={() => setViewMode("cards")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${viewMode === "cards"
-                ? "bg-white text-primary-base shadow-2xs font-black"
-                : "text-grey-5 hover:text-dark-1"
+              ? "bg-white text-primary-base shadow-2xs font-black"
+              : "text-grey-5 hover:text-dark-1"
               }`}
             title="Action Cards Grid View"
           >
