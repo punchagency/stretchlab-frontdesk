@@ -42,7 +42,6 @@ export const ClientActionsPage = () => {
       const response = await getFrontdeskHome({ page_size: 1 });
       return response.data?.data;
     },
-    staleTime: 10 * 60 * 1000,
   });
 
   const locations = homeData?.locations || [];
@@ -184,10 +183,10 @@ export const ClientActionsPage = () => {
       {refreshBanner && (
         <div
           className={`p-4 rounded-2xl border flex items-start justify-between gap-3 animate-in fade-in duration-200 text-xs ${refreshBanner.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-              : refreshBanner.type === "warning"
-                ? "bg-amber-50 border-amber-300 text-amber-900"
-                : "bg-rose-50 border-rose-200 text-rose-900"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+            : refreshBanner.type === "warning"
+              ? "bg-amber-50 border-amber-300 text-amber-900"
+              : "bg-rose-50 border-rose-200 text-rose-900"
             }`}
         >
           <div className="flex items-start gap-2.5">
@@ -215,10 +214,10 @@ export const ClientActionsPage = () => {
                       <div
                         key={idx}
                         className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold border flex flex-col gap-0.5 shadow-2xs ${allGood
-                            ? "bg-white/90 border-emerald-300 text-emerald-950"
-                            : allFailed
-                              ? "bg-white/90 border-rose-300 text-rose-950"
-                              : "bg-white/90 border-amber-300 text-amber-950"
+                          ? "bg-white/90 border-emerald-300 text-emerald-950"
+                          : allFailed
+                            ? "bg-white/90 border-rose-300 text-rose-950"
+                            : "bg-white/90 border-amber-300 text-amber-950"
                           }`}
                       >
                         <span className="font-extrabold text-[11.5px]">{loc.location_name}</span>

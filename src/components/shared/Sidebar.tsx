@@ -3,6 +3,7 @@ import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target } from "lucide-r
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -50,7 +51,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const userInfo = getUserInfo();
-
+  const queryClient = useQueryClient();
   const canAccessAdmin = hasRole(userInfo, [1, 2, 4]);
   const canAccessNoteApp = hasRole(userInfo, [3]);
 
@@ -61,6 +62,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       // Proceed even if network request fails
     } finally {
       deleteUserCookie();
+      queryClient.clear();
       navigate("/login");
     }
   };

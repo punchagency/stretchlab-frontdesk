@@ -5,9 +5,12 @@ import { ApiError } from "../../types";
 import { setUserCookie, setRefreshToken } from "../../utils/user";
 import { useNavigate } from "react-router";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+
 
 export const LoginForm = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -44,6 +47,7 @@ export const LoginForm = () => {
         if (response.data.refresh_token) {
           setRefreshToken(response.data.refresh_token);
         }
+        queryClient.clear();
         navigate("/");
       }
     } catch (err) {
