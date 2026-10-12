@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Clock,
   CheckCircle2,
+  ArrowDown,
 } from "lucide-react";
 import {
   ClientActionRow,
@@ -43,10 +44,18 @@ interface TimeSlotGroup {
 const parseTimeToMinutes = (timeStr?: string | null): number => {
   if (!timeStr) return 99999;
   const clean = timeStr.trim().toUpperCase();
-  const isPM = clean.includes("PM");
-  const isAM = clean.includes("AM");
 
-  const digits = clean.replace(/[^\d:]/g, "").split(":");
+  let timePart = clean;
+  if (timePart.includes("T")) {
+    timePart = timePart.split("T")[1];
+  } else if (timePart.includes("-") && timePart.includes(" ")) {
+    timePart = timePart.split(" ")[1];
+  }
+
+  const isPM = timePart.includes("PM");
+  const isAM = timePart.includes("AM");
+
+  const digits = timePart.replace(/[^\d:]/g, "").split(":");
   let hours = parseInt(digits[0], 10) || 0;
   const minutes = parseInt(digits[1], 10) || 0;
 
@@ -79,16 +88,18 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   // Slot pagination state: default 5 time slots per page
   const [slotPage, setSlotPage] = useState(1);
   const [slotPageSize, setSlotPageSize] = useState(5);
+  const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
+  const hasAutoScrolledRef = useRef(false);
 
-  // Reset pagination when date changes
+  // Reset pagination and auto-scroll flag when date changes
   useEffect(() => {
     setSlotPage(1);
+    setActiveSlotKey(null);
+    hasAutoScrolledRef.current = false;
   }, [selectedDate]);
 
   // Group and sort bookings into chronological time slots
-  // totalActionsToday
-  // nextUpSlotKey
-  const { slots } = useMemo(() => {
+  const { slots, nextUpSlotKey, totalActionsToday } = useMemo(() => {
     const isToday = selectedDate === todayStr;
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -132,22 +143,24 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     // Sort chronologically
     parsedSlots.sort((a, b) => a.minutes - b.minutes);
 
-    // Find "Next Up" slot if viewing today
+    // Find "Current / Next Up" slot if viewing today
     let foundNextUpKey: string | null = null;
     if (isToday && parsedSlots.length > 0) {
-      const nextSlot = parsedSlots.find(
-        (s) => s.minutes !== 99999 && s.minutes >= currentMinutes - 20
-      );
-      if (nextSlot) {
-        foundNextUpKey = nextSlot.timeKey;
-        nextSlot.isNextUp = true;
-      } else {
-        const lastScheduled = [...parsedSlots]
-          .reverse()
-          .find((s) => s.minutes !== 99999);
-        if (lastScheduled) {
-          foundNextUpKey = lastScheduled.timeKey;
-          lastScheduled.isNextUp = true;
+      const scheduledSlots = parsedSlots.filter((s) => s.minutes !== 99999);
+      if (scheduledSlots.length > 0) {
+        // Select slot currently in progress (within 30 mins after start) or earliest upcoming slot
+        const nextSlot = scheduledSlots.find(
+          (s) => s.minutes >= currentMinutes - 30
+        );
+        if (nextSlot) {
+          foundNextUpKey = nextSlot.timeKey;
+          nextSlot.isNextUp = true;
+        } else {
+          const lastScheduled = scheduledSlots[scheduledSlots.length - 1];
+          if (lastScheduled) {
+            foundNextUpKey = lastScheduled.timeKey;
+            lastScheduled.isNextUp = true;
+          }
         }
       }
     }
@@ -161,23 +174,72 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     };
   }, [bookings, selectedDate, todayStr]);
 
-  // Handle jump button: switches to appropriate page then scrolls
-  // const handleScrollToNextUp = () => {
-  //   if (nextUpSlotKey && slotPageSize > 0) {
-  //     const nextUpIdx = slots.findIndex((s) => s.timeKey === nextUpSlotKey);
-  //     if (nextUpIdx >= 0) {
-  //       const targetPage = Math.floor(nextUpIdx / slotPageSize) + 1;
-  //       if (slotPage !== targetPage) {
-  //         setSlotPage(targetPage);
-  //       }
-  //     }
-  //   }
-  //   setTimeout(() => {
-  //     if (nextUpRef.current) {
-  //       nextUpRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-  //     }
-  //   }, 60);
-  // };
+  // Navigate & scroll to any specified slot
+  const scrollToSlot = (timeKey: string) => {
+    setActiveSlotKey(timeKey);
+    const slotIdx = slots.findIndex((s) => s.timeKey === timeKey);
+    if (slotIdx >= 0 && slotPageSize > 0) {
+      const targetPage = Math.floor(slotIdx / slotPageSize) + 1;
+      if (slotPage !== targetPage) {
+        setSlotPage(targetPage);
+      }
+    }
+
+    const safeId = `timeline-slot-${timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const executeScroll = () => {
+      const el =
+        document.getElementById(safeId) ||
+        (timeKey === nextUpSlotKey ? nextUpRef.current : null);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return true;
+      }
+      return false;
+    };
+
+    if (!executeScroll()) {
+      setTimeout(executeScroll, 120);
+      setTimeout(executeScroll, 300);
+    }
+  };
+
+  // Jump to Current / Next Up button
+  const handleScrollToNextUp = () => {
+    if (nextUpSlotKey) {
+      scrollToSlot(nextUpSlotKey);
+    }
+  };
+
+  // Automatically navigate user to the current time slot on initial view / load of today
+  useEffect(() => {
+    if (
+      selectedDate === todayStr &&
+      nextUpSlotKey &&
+      !hasAutoScrolledRef.current &&
+      slots.length > 0
+    ) {
+      const slotIdx = slots.findIndex((s) => s.timeKey === nextUpSlotKey);
+      if (slotIdx >= 0 && slotPageSize > 0) {
+        const targetPage = Math.floor(slotIdx / slotPageSize) + 1;
+        if (slotPage !== targetPage) {
+          setSlotPage(targetPage);
+          return;
+        }
+      }
+
+      const timer = setTimeout(() => {
+        const safeId = `timeline-slot-${nextUpSlotKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        const el = document.getElementById(safeId) || nextUpRef.current;
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          hasAutoScrolledRef.current = true;
+          setActiveSlotKey(nextUpSlotKey);
+        }
+      }, 180);
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDate, todayStr, nextUpSlotKey, slotPageSize, slots, slotPage]);
 
   const totalSlotPages =
     slotPageSize === 0 ? 1 : Math.max(1, Math.ceil(slots.length / slotPageSize));
@@ -221,54 +283,134 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   return (
     <div className="space-y-6">
       {/* Timeline Controls & Quick Navigation Bar */}
-      {/* <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl p-4 border border-neutral-tertiary shadow-2xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-primary-base/10 text-primary-base flex items-center justify-center font-black">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="text-xs font-black text-dark-1 uppercase tracking-wider">
-              Chronological Arrival Stream
-            </h4>
-            <p className="text-[11px] text-grey-5">
-              <span>{bookings.length} clients</span>
-              <span className="mx-1.5">·</span>
-              <span>{slots.length} session time slots</span>
-              {totalActionsToday > 0 && (
-                <>
-                  <span className="mx-1.5">·</span>
-                  <span className="font-bold text-rose-700">
-                    {totalActionsToday} pending action
-                    {totalActionsToday === 1 ? "" : "s"}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-neutral-tertiary shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-primary-base/10 text-primary-base flex items-center justify-center font-black">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-black text-dark-1 uppercase tracking-wider">
+                  Chronological Arrival Stream
+                </h4>
+                {selectedDate === todayStr && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Live Schedule</span>
                   </span>
-                </>
-              )}
-            </p>
+                )}
+              </div>
+              <p className="text-[11px] text-grey-5 flex items-center flex-wrap gap-1.5 mt-0.5">
+                <span>{bookings.length} clients</span>
+                <span>·</span>
+                <span>{slots.length} session time slots</span>
+                {totalActionsToday > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="font-bold text-rose-700">
+                      {totalActionsToday} pending action
+                      {totalActionsToday === 1 ? "" : "s"}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
           </div>
+
+          {nextUpSlotKey && selectedDate === todayStr && (
+            <button
+              type="button"
+              onClick={handleScrollToNextUp}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-primary-base text-white hover:bg-primary-base/90 shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <ArrowDown className="w-3.5 h-3.5" />
+              <span>Jump to Current ({nextUpSlotKey})</span>
+            </button>
+          )}
         </div>
 
-        {nextUpSlotKey && selectedDate === todayStr && (
-          <button
-            type="button"
-            onClick={handleScrollToNextUp}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-primary-base text-white hover:bg-primary-base/90 shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
-          >
-            <ArrowDown className="w-3.5 h-3.5" />
-            <span>Jump to Next Up ({nextUpSlotKey})</span>
-          </button>
+        {/* Quick Navigation Bar: Horizontal scrollable time slot pills */}
+        {slots.length > 1 && (
+          <div className="pt-3 border-t border-neutral-tertiary/70">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px] font-black text-grey-5 uppercase tracking-wider flex items-center gap-1.5">
+                <span>Quick Navigation</span>
+                <span className="text-grey-4 font-normal">({slots.length} slots)</span>
+              </span>
+              <span className="text-[10px] text-grey-4 hidden sm:inline">
+                Click any slot to jump directly
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+              {slots.map((slot) => {
+                const isCurrent = slot.isNextUp && selectedDate === todayStr;
+                const isSelected = activeSlotKey === slot.timeKey;
+
+                return (
+                  <button
+                    key={slot.timeKey}
+                    type="button"
+                    onClick={() => scrollToSlot(slot.timeKey)}
+                    className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? "bg-primary-base text-white shadow-2xs ring-2 ring-primary-base/30"
+                        : isCurrent
+                        ? "bg-primary-base/15 text-primary-base border border-primary-base/30 font-black hover:bg-primary-base/20"
+                        : "bg-neutral-quaternary text-dark-1 hover:bg-neutral-tertiary/70 border border-neutral-tertiary"
+                    }`}
+                  >
+                    <span>{slot.displayTime}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                        isSelected
+                          ? "bg-white/20 text-white"
+                          : isCurrent
+                          ? "bg-primary-base text-white"
+                          : "bg-white text-grey-5 border border-neutral-tertiary"
+                      }`}
+                    >
+                      {slot.bookings.length}
+                    </span>
+                    {slot.actionCount > 0 && (
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isSelected
+                            ? "bg-amber-300"
+                            : isCurrent
+                            ? "bg-rose-500"
+                            : "bg-rose-500"
+                        }`}
+                        title={`${slot.actionCount} action(s) required`}
+                      />
+                    )}
+                    {isCurrent && !isSelected && (
+                      <span className="text-[9px] font-black uppercase text-primary-base bg-primary-base/10 px-1 py-0.2 rounded">
+                        Now
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
-      </div> */}
+      </div>
 
       {/* Vertical Timeline Track */}
       <div className="relative pl-4 sm:pl-8 space-y-8 before:absolute before:left-[19px] sm:before:left-[35px] before:top-4 before:bottom-4 before:w-0.5 before:bg-gradient-to-b before:from-primary-base before:via-neutral-tertiary before:to-neutral-tertiary/40">
         {visibleSlots.map((slot) => {
           const isSlotNextUp = slot.isNextUp;
+          const isSlotActive = activeSlotKey === slot.timeKey;
 
           return (
             <div
               key={slot.timeKey}
+              id={`timeline-slot-${slot.timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`}
               ref={isSlotNextUp ? nextUpRef : null}
-              className="relative space-y-3"
+              className={`relative space-y-3 transition-all duration-300 scroll-mt-6 ${
+                isSlotActive ? "ring-2 ring-primary-base/20 rounded-2xl p-2 -m-2 bg-primary-base/[0.02]" : ""
+              }`}
             >
               {/* Timeline Slot Header Node */}
               <div className="flex items-center gap-3">

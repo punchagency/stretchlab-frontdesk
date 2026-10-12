@@ -5,21 +5,16 @@ import {
   Check,
   AlertTriangle,
   Eye,
-  Square,
-  CheckSquare,
   Loader2,
   MessageSquare,
   MapPin,
   Clock,
-  Target,
-  CalendarDays,
   Sparkles,
   Undo2,
 } from "lucide-react";
 import {
   ClientActionRow,
   ActionEntry,
-  toBook,
 } from "../../service/clientActions";
 import { ActionBadgeChip } from "./ActionBadgeChip";
 import {
@@ -132,10 +127,10 @@ const ActionsTakenList: React.FC<{
           entry.action === "maps"
             ? "MAPS"
             : entry.action === "book_next"
-            ? `Booked ${(entry.check?.evidence as any)?.claimed ?? (entry.check?.evidence as any)?.found ?? entry.booked_count ?? ""}`
-            : entry.action === "intake_form"
-            ? "Intake Form"
-            : "Goal";
+              ? `Booked ${(entry.check?.evidence as any)?.claimed ?? (entry.check?.evidence as any)?.found ?? entry.booked_count ?? ""}`
+              : entry.action === "intake_form"
+                ? "Intake Form"
+                : "Goal";
 
         return (
           <TooltipProvider key={entry.id} delayDuration={150}>
@@ -218,29 +213,26 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   formatUtcDateTime,
 }) => {
   const isStale = Boolean(row.stale);
-  const isFollowUpChecked = Boolean(row.intake?.follow_up?.checked);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
   const hasActions = row.badges.length > 0;
-  const neededBookings = toBook(row) ?? 1;
+  const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
 
   return (
     <div
-      className={`group relative bg-white rounded-2xl p-4 border transition-all duration-200 hover:shadow-md hover:border-primary-base/40 ${
-        hasActions
-          ? "border-neutral-tertiary"
-          : "border-neutral-tertiary/70 bg-neutral-quaternary/10"
-      }`}
+      className={`group relative bg-white rounded-2xl p-4 border transition-all duration-200 hover:shadow-md hover:border-primary-base/40 ${hasActions
+        ? "border-neutral-tertiary"
+        : "border-neutral-tertiary/70 bg-neutral-quaternary/10"
+        }`}
     >
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Left Section: Avatar, Client Name, CR ID, Session & Staff */}
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
           <div className="relative shrink-0">
             <div
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xs border ${
-                row.first_visit
-                  ? "bg-primary-base text-white border-primary-base shadow-xs"
-                  : "bg-primary-base/10 text-primary-base border-primary-base/20"
-              }`}
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xs border ${row.first_visit
+                ? "bg-primary-base text-white border-primary-base shadow-xs"
+                : "bg-primary-base/10 text-primary-base border-primary-base/20"
+                }`}
             >
               {getInitials(row.client_name)}
             </div>
@@ -359,7 +351,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
         {/* Right Section: Badges & Fast Action Buttons */}
         <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap pt-2 lg:pt-0 border-t lg:border-t-0 border-neutral-tertiary/60">
           {/* Action Badges */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1">
             {row.badges.length === 0 ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <span>✓ No Action Needed</span>
@@ -378,6 +370,8 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
                     onToggleFollowUp={onToggleFollowUp}
                     onLogMaps={onLogMaps}
                     onLogBookNext={onLogBookNext}
+                    isToggling={isToggling}
+                    isLoggingAction={isLoggingAction}
                   />
                 ))}
               </>
@@ -385,145 +379,41 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
           </div>
 
           {/* Quick Action Buttons Group */}
-          <div className="flex items-center gap-1.5 shrink-0 pl-1 border-l border-neutral-tertiary/70">
-            {/* Quick 1-click MAPS Log */}
-            {row.badges.includes("maps_due") && onLogMaps && (
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      disabled={isLoggingAction}
-                      onClick={() => onLogMaps(row)}
-                      className="px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Target className="w-3.5 h-3.5 text-slate-300" />
-                      <span>Log MAPS</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    <p className="font-semibold text-[11px]">
-                      Mark MAPS Assessment Completed
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
-            {/* Quick 1-click Book Next Log */}
-            {row.badges.includes("future_bookings_below_target") &&
-              onLogBookNext && (
+          {((!hasGoalBadge && row.clubready_user_id) || (row.intake && !row.intake.form_received && row.clubready_user_id)) && (
+            <div className="flex items-center gap-1.5 shrink-0 pl-1 border-l border-neutral-tertiary/70">
+              {!hasGoalBadge && row.clubready_user_id && (
                 <TooltipProvider delayDuration={150}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        disabled={isLoggingAction}
-                        onClick={() => onLogBookNext(row, neededBookings)}
-                        className="px-2.5 py-1.5 rounded-xl border border-indigo-700 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                        onClick={() => onGoalClick(row)}
+                        className="p-2 rounded-xl border border-primary-base/20 bg-primary-base/5 hover:bg-primary-base hover:text-white text-primary-base font-extrabold transition-all cursor-pointer shadow-2xs group"
+                        aria-label="View Record & Goals"
                       >
-                        <CalendarDays className="w-3.5 h-3.5 text-indigo-200" />
-                        <span>Log Booked ({neededBookings})</span>
+                        <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
                       <p className="font-semibold text-[11px]">
-                        Mark {neededBookings} upcoming session(s) booked
+                        View Record & Goals
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
 
-            {row.clubready_user_id && (
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => onGoalClick(row)}
-                      className="p-2 rounded-xl border border-primary-base/20 bg-primary-base/5 hover:bg-primary-base hover:text-white text-primary-base font-extrabold transition-all cursor-pointer shadow-2xs group"
-                      aria-label="View Record & Goals"
-                    >
-                      <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    <p className="font-semibold text-[11px]">
-                      View Record & Goals
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
-            {row.intake && !row.intake.form_received && row.clubready_user_id && (
-              <>
-                <TooltipProvider delayDuration={150}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        disabled={isToggling}
-                        onClick={() => onToggleFollowUp(row)}
-                        className={`p-2 rounded-xl border transition-all cursor-pointer disabled:opacity-50 ${
-                          isFollowUpChecked
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
-                            : "bg-white text-zinc-400 border-zinc-300 hover:border-zinc-500 hover:text-zinc-700"
-                        }`}
-                        aria-label={
-                          isFollowUpChecked
-                            ? "Mark as un-reminded"
-                            : "Mark as reminded"
-                        }
-                      >
-                        {isToggling ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-primary-base" />
-                        ) : isFollowUpChecked ? (
-                          <CheckSquare className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <Square className="w-4 h-4" />
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      {isFollowUpChecked ? (
-                        <div className="text-[11px] font-medium space-y-0.5">
-                          <p className="font-bold text-emerald-400">
-                            Intake Follow-up Completed
-                          </p>
-                          {row.intake.follow_up?.checked_by_name && (
-                            <p>By: {row.intake.follow_up.checked_by_name}</p>
-                          )}
-                          {row.intake.follow_up?.checked_at && (
-                            <p>
-                              Time:{" "}
-                              {formatUtcDateTime(
-                                row.intake.follow_up.checked_at
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="font-semibold text-[11px]">
-                          Mark Followed Up (Reminded/Handed Form)
-                        </p>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
+              {row.intake && !row.intake.form_received && row.clubready_user_id && (
                 <TooltipProvider delayDuration={150}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         type="button"
                         onClick={() => onOpenNoteDrawer(row)}
-                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                          hasFollowUpNote
-                            ? "bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100 shadow-2xs"
-                            : "bg-white text-zinc-400 border-zinc-200 hover:border-zinc-400 hover:text-zinc-600"
-                        }`}
+                        className={`p-2 rounded-xl border transition-all cursor-pointer ${hasFollowUpNote
+                          ? "bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100 shadow-2xs"
+                          : "bg-white text-zinc-400 border-zinc-200 hover:border-zinc-400 hover:text-zinc-600"
+                          }`}
                         aria-label={
                           hasFollowUpNote
                             ? `Note: "${row.intake?.follow_up?.note}"`
@@ -542,9 +432,9 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -609,18 +499,16 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   formatUtcDateTime,
 }) => {
   const isStale = Boolean(row.stale);
-  const isFollowUpChecked = Boolean(row.intake?.follow_up?.checked);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
   const hasActions = row.badges.length > 0;
-  const neededBookings = toBook(row) ?? 1;
+  const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
 
   return (
     <div
-      className={`group relative bg-white rounded-3xl p-5 border transition-all duration-200 hover:shadow-lg flex flex-col justify-between space-y-4 ${
-        hasActions
-          ? "border-neutral-tertiary hover:border-primary-base/50"
-          : "border-neutral-tertiary/70 bg-neutral-quaternary/10 hover:border-neutral-tertiary"
-      }`}
+      className={`group relative bg-white rounded-3xl p-5 border transition-all duration-200 hover:shadow-lg flex flex-col justify-between space-y-4 ${hasActions
+        ? "border-neutral-tertiary hover:border-primary-base/50"
+        : "border-neutral-tertiary/70 bg-neutral-quaternary/10 hover:border-neutral-tertiary"
+        }`}
     >
       {/* Top Header: Time Pill & Status Badges */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -655,11 +543,10 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
       <div className="flex items-start gap-3.5 pt-1">
         <div className="relative shrink-0">
           <div
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border ${
-              row.first_visit
-                ? "bg-primary-base text-white border-primary-base shadow-xs"
-                : "bg-primary-base/10 text-primary-base border-primary-base/20"
-            }`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border ${row.first_visit
+              ? "bg-primary-base text-white border-primary-base shadow-xs"
+              : "bg-primary-base/10 text-primary-base border-primary-base/20"
+              }`}
           >
             {getInitials(row.client_name)}
           </div>
@@ -797,6 +684,8 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
                   onToggleFollowUp={onToggleFollowUp}
                   onLogMaps={onLogMaps}
                   onLogBookNext={onLogBookNext}
+                  isToggling={isToggling}
+                  isLoggingAction={isLoggingAction}
                 />
               ))}
             </>
@@ -812,36 +701,9 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
       />
 
       {/* Footer: Quick Action Buttons */}
-      <div className="pt-3 border-t border-neutral-tertiary/60 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          {row.badges.includes("maps_due") && onLogMaps && (
-            <button
-              type="button"
-              disabled={isLoggingAction}
-              onClick={() => onLogMaps(row)}
-              className="px-2 py-1 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1 disabled:opacity-50"
-            >
-              <Target className="w-3 h-3 text-slate-300" />
-              <span>Log MAPS</span>
-            </button>
-          )}
-
-          {row.badges.includes("future_bookings_below_target") &&
-            onLogBookNext && (
-              <button
-                type="button"
-                disabled={isLoggingAction}
-                onClick={() => onLogBookNext(row, neededBookings)}
-                className="px-2 py-1 rounded-xl border border-indigo-700 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition-all cursor-pointer shadow-2xs flex items-center gap-1 disabled:opacity-50"
-              >
-                <CalendarDays className="w-3 h-3 text-indigo-200" />
-                <span>Log Booked ({neededBookings})</span>
-              </button>
-            )}
-        </div>
-
-        <div className="flex items-center gap-1.5 ml-auto">
-          {row.clubready_user_id && (
+      {((!hasGoalBadge && row.clubready_user_id) || (row.intake && !row.intake.form_received && row.clubready_user_id)) && (
+        <div className="pt-3 border-t border-neutral-tertiary/60 flex items-center justify-end gap-1.5">
+          {!hasGoalBadge && row.clubready_user_id && (
             <TooltipProvider delayDuration={150}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -864,94 +726,37 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
           )}
 
           {row.intake && !row.intake.form_received && row.clubready_user_id && (
-            <>
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      disabled={isToggling}
-                      onClick={() => onToggleFollowUp(row)}
-                      className={`p-2 rounded-xl border transition-all cursor-pointer disabled:opacity-50 ${
-                        isFollowUpChecked
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
-                          : "bg-white text-zinc-400 border-zinc-300 hover:border-zinc-500 hover:text-zinc-700"
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onOpenNoteDrawer(row)}
+                    className={`p-2 rounded-xl border transition-all cursor-pointer ${hasFollowUpNote
+                      ? "bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100 shadow-2xs"
+                      : "bg-white text-zinc-400 border-zinc-200 hover:border-zinc-400 hover:text-zinc-600"
                       }`}
-                      aria-label={
-                        isFollowUpChecked
-                          ? "Mark as un-reminded"
-                          : "Mark as reminded"
-                      }
-                    >
-                      {isToggling ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-primary-base" />
-                      ) : isFollowUpChecked ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-600" />
-                      ) : (
-                        <Square className="w-4 h-4" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    {isFollowUpChecked ? (
-                      <div className="text-[11px] font-medium space-y-0.5">
-                        <p className="font-bold text-emerald-400">
-                          Intake Follow-up Completed
-                        </p>
-                        {row.intake.follow_up?.checked_by_name && (
-                          <p>By: {row.intake.follow_up.checked_by_name}</p>
-                        )}
-                        {row.intake.follow_up?.checked_at && (
-                          <p>
-                            Time:{" "}
-                            {formatUtcDateTime(
-                              row.intake.follow_up.checked_at
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="font-semibold text-[11px]">
-                        Mark Followed Up (Reminded/Handed Form)
-                      </p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => onOpenNoteDrawer(row)}
-                      className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                        hasFollowUpNote
-                          ? "bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100 shadow-2xs"
-                          : "bg-white text-zinc-400 border-zinc-200 hover:border-zinc-400 hover:text-zinc-600"
-                      }`}
-                      aria-label={
-                        hasFollowUpNote
-                          ? `Note: "${row.intake?.follow_up?.note}"`
-                          : "Add follow-up note"
-                      }
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs max-w-xs">
-                    <p className="font-semibold text-[11px]">
-                      {hasFollowUpNote
-                        ? `Note: "${row.intake?.follow_up?.note}" (Click to edit)`
-                        : "Add Follow-up Note"}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </>
+                    aria-label={
+                      hasFollowUpNote
+                        ? `Note: "${row.intake?.follow_up?.note}"`
+                        : "Add follow-up note"
+                    }
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs max-w-xs">
+                  <p className="font-semibold text-[11px]">
+                    {hasFollowUpNote
+                      ? `Note: "${row.intake?.follow_up?.note}" (Click to edit)`
+                      : "Add Follow-up Note"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };

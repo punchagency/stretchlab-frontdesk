@@ -442,6 +442,115 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         staff_id: activeStaffId || undefined,
       });
     },
+    onMutate: async ({ row, action, bookedCount, note }) => {
+      const actionsQueryKey = [
+        "frontdesk-client-actions",
+        selectedDate,
+        selectedLocation || undefined,
+      ];
+      await queryClient.cancelQueries({ queryKey: actionsQueryKey });
+      const previousData =
+        queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
+
+      if (previousData) {
+        const staffMember = deskStaffList.find((s) => s.id === activeStaffId);
+        const staffMemberName = staffMember?.name || "You";
+
+        const tempEntry: ActionEntry = {
+          id: Date.now(),
+          action,
+          booking_date: selectedDate,
+          booking_id: row.booking_id || null,
+          location_name: row.location_name || null,
+          store_id: row.intake?.location_id || null,
+          booked_count: action === "book_next" ? (bookedCount ?? 1) : null,
+          client_goal_id: null,
+          note: note || null,
+          done_by: 0,
+          done_by_name: staffMemberName,
+          staff_id: activeStaffId || null,
+          staff_name: staffMemberName,
+          done_at: new Date().toISOString(),
+          undone_at: null,
+          undone_by: null,
+          undone_by_name: null,
+          undone_staff_id: null,
+          undone_staff_name: null,
+          check: {
+            status: "pending",
+            reason: "logged_optimistically",
+            evidence: null,
+          },
+        };
+
+        const updatedBookings = previousData.data.bookings.map((b) => {
+          const isSameRow =
+            (row.booking_id && b.booking_id === row.booking_id) ||
+            (row.clubready_user_id && b.clubready_user_id === row.clubready_user_id);
+
+          if (!isSameRow) return b;
+
+          const updatedBadges = b.badges.filter((badge) => {
+            if (action === "maps" && badge === "maps_due") return false;
+            if (action === "book_next" && badge === "future_bookings_below_target") return false;
+            return true;
+          });
+
+          return {
+            ...b,
+            badges: updatedBadges,
+            actions_taken: [tempEntry, ...(b.actions_taken || [])],
+            ...(action === "maps"
+              ? {
+                  maps: {
+                    ...b.maps,
+                    due: false,
+                    days_since_reading: 0,
+                    last_reading: "Completed today",
+                    reading_date: selectedDate,
+                  },
+                }
+              : {}),
+            ...(action === "book_next"
+              ? {
+                  future_bookings: {
+                    ...b.future_bookings,
+                    count: (b.future_bookings?.count ?? 0) + (bookedCount ?? 1),
+                  },
+                }
+              : {}),
+          };
+        });
+
+        const summary = { ...previousData.data.summary };
+        if (action === "maps" && summary.maps_due) {
+          summary.maps_due = Math.max(0, summary.maps_due - 1);
+        }
+        if (action === "book_next" && summary.future_bookings_below_target) {
+          summary.future_bookings_below_target = Math.max(
+            0,
+            summary.future_bookings_below_target - 1
+          );
+        }
+        if (summary.actions_taken) {
+          summary.actions_taken = {
+            ...summary.actions_taken,
+            [action]: (summary.actions_taken[action] || 0) + 1,
+          };
+        }
+
+        queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
+          ...previousData,
+          data: {
+            ...previousData.data,
+            bookings: updatedBookings,
+            summary,
+          },
+        });
+      }
+
+      return { previousData, actionsQueryKey };
+    },
     onSuccess: (res, vars) => {
       const actName =
         vars.action === "maps" ? "MAPS assessment" : "Book Next";
@@ -452,16 +561,21 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           `Logged ${actName} for ${vars.row.client_name || "client"}`
         );
       }
-      queryClient.invalidateQueries({
-        queryKey: ["frontdesk-client-actions"],
-      });
     },
-    onError: (err: any) => {
+    onError: (err: any, _vars, context) => {
+      if (context?.previousData && context?.actionsQueryKey) {
+        queryClient.setQueryData(context.actionsQueryKey, context.previousData);
+      }
       const msg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         "Failed to log action.";
       renderErrorToast(msg);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["frontdesk-client-actions"],
+      });
     },
   });
 
@@ -471,13 +585,40 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       setUndoingEntryId(entryId);
       return undoClientAction(entryId, activeStaffId || undefined);
     },
+    onMutate: async ({ entryId }) => {
+      const actionsQueryKey = [
+        "frontdesk-client-actions",
+        selectedDate,
+        selectedLocation || undefined,
+      ];
+      await queryClient.cancelQueries({ queryKey: actionsQueryKey });
+      const previousData =
+        queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
+
+      if (previousData) {
+        const updatedBookings = previousData.data.bookings.map((b) => ({
+          ...b,
+          actions_taken: (b.actions_taken || []).filter((a) => a.id !== entryId),
+        }));
+
+        queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
+          ...previousData,
+          data: {
+            ...previousData.data,
+            bookings: updatedBookings,
+          },
+        });
+      }
+
+      return { previousData, actionsQueryKey };
+    },
     onSuccess: () => {
       renderSuccessToast("Action log withdrawn successfully");
-      queryClient.invalidateQueries({
-        queryKey: ["frontdesk-client-actions"],
-      });
     },
-    onError: (err: any) => {
+    onError: (err: any, _vars, context) => {
+      if (context?.previousData && context?.actionsQueryKey) {
+        queryClient.setQueryData(context.actionsQueryKey, context.previousData);
+      }
       const msg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
@@ -486,6 +627,9 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     },
     onSettled: () => {
       setUndoingEntryId(null);
+      queryClient.invalidateQueries({
+        queryKey: ["frontdesk-client-actions"],
+      });
     },
   });
 
