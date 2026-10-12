@@ -331,12 +331,17 @@ export interface IntakeFormLocation {
   intake_form_submissions: number;
   first_visits: number;
   intake_form_submission_rate?: number;
+  first_visits_with_intake_form_rate?: number;
   first_visits_with_intake_form?: number;
   first_visit_conversions_with_intake_form?: number;
   conversion_rate_with_intake_form?: number;
   first_visits_without_intake_form?: number;
   first_visit_conversions_without_intake_form?: number;
   conversion_rate_without_intake_form?: number;
+  first_visit_conversions?: number;
+  conversion_rate?: number;
+  intake_forms_unmatched?: number;
+  intake_forms_for_later_visits?: number | null;
   conversion_percentage: number;
   first_visits_from_intake_form: number;
   matched_conversion_percentage: number;
@@ -349,6 +354,7 @@ export interface IntakeFormConversionData {
   intake_form_submissions: number;
   first_visits: number;
   intake_form_submission_rate?: number;
+  first_visits_with_intake_form_rate?: number;
   first_visits_with_intake_form?: number;
   first_visit_conversions_with_intake_form?: number;
   conversion_rate_with_intake_form?: number;
@@ -357,6 +363,8 @@ export interface IntakeFormConversionData {
   conversion_rate_without_intake_form?: number;
   first_visit_conversions?: number;
   conversion_rate?: number;
+  intake_forms_unmatched?: number;
+  intake_forms_for_later_visits?: number | null;
   conversion_percentage: number;
   first_visits_from_intake_form: number;
   matched_conversion_percentage: number;
@@ -369,6 +377,45 @@ export interface IntakeFormConversionData {
 export interface IntakeFormConversionResponse {
   status: string;
   data: IntakeFormConversionData;
+}
+
+export interface IntakeConversionTrendPoint {
+  week_start: string;
+  week_end: string;
+  window_start: string;
+  window_end: string;
+  in_progress: boolean;
+  first_visits: number;
+  intake_form_submissions: number;
+  intake_form_submission_rate: number | null;
+  first_visits_with_intake_form_rate: number | null;
+  first_visits_with_intake_form: number;
+  first_visit_conversions_with_intake_form: number;
+  conversion_rate_with_intake_form: number | null;
+  first_visits_without_intake_form: number;
+  first_visit_conversions_without_intake_form: number;
+  conversion_rate_without_intake_form: number | null;
+}
+
+export interface IntakeConversionTrendLocation {
+  location_id: string;
+  location_name: string;
+  points: IntakeConversionTrendPoint[];
+}
+
+export interface IntakeConversionTrendData {
+  weeks: number;
+  window_weeks: number;
+  lookback_days: number;
+  start_date: string;
+  end_date: string;
+  studio: IntakeConversionTrendPoint[];
+  locations: IntakeConversionTrendLocation[];
+}
+
+export interface IntakeConversionTrendResponse {
+  status: "success";
+  data: IntakeConversionTrendData;
 }
 
 export const getIntakeFormConversion = async (params: {
@@ -393,6 +440,28 @@ export const getIntakeFormConversion = async (params: {
   );
   return response.data;
 };
+
+export const getIntakeConversionTrend = async (params: {
+  weeks?: number;
+  endDate?: string;
+  location?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params.weeks) {
+    queryParams.append("weeks", String(params.weeks));
+  }
+  const localDay = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  queryParams.append("end_date", params.endDate ?? localDay());
+  if (params.location && params.location.toLowerCase() !== "all") {
+    queryParams.append("location", params.location.toLowerCase());
+  }
+  const response = await api.get<IntakeConversionTrendResponse>(
+    `/admin/dashboard/intake_form_conversion/trend?${queryParams.toString()}`
+  );
+  return response.data;
+};
+
 
 export interface IntakeEmailPayload {
   submission_id: number;

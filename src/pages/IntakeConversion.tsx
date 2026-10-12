@@ -34,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../components/ui/tooltip";
+import { IntakeConversionTrendChart, WEEKS_OPTIONS } from "../components/shared";
 
 const DURATION_OPTIONS: DurationOption[] = [
   { value: "yesterday", label: "Yesterday" },
@@ -103,6 +104,15 @@ const CustomTooltip = ({ active, payload }: any) => {
               {data.conversion_rate_without_intake_form}%
             </span>
           </div>
+          <div className="flex justify-between items-center py-0.5 border-b border-neutral-tertiary/40">
+            <span className="font-semibold text-dark-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0"></span>
+              Conversion (All):
+            </span>
+            <span className="font-black text-indigo-600 text-xs">
+              {data.first_visits === 0 ? "No first visits" : `${data.conversion_rate}%`}
+            </span>
+          </div>
           <div className="flex justify-between items-center py-0.5 text-[11px] text-grey-5">
             <span>Conversions (With / Without Intake):</span>
             <span className="font-bold text-dark-1">
@@ -133,9 +143,13 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
 
   const [duration, setDuration] = useState("this_month");
   const [selectedLocation, setSelectedLocation] = useState("All");
+  const [weeks, setWeeks] = useState(12);
+  const [chartTab, setChartTab] = useState<"studios" | "trend">("studios");
   const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(
     null
   );
+
+
   const [isSmallScreen, setIsSmallScreen] = useState<boolean>(() =>
     typeof window !== "undefined" ? window.innerWidth < 1024 : false
   );
@@ -190,6 +204,22 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
     setDuration("custom");
   };
 
+  const overallRate = (loc: IntakeFormLocation) =>
+    loc.conversion_rate ??
+    (loc.first_visits
+      ? Math.round(
+        ((loc.first_visit_conversions_with_intake_form ?? 0) +
+          (loc.first_visit_conversions_without_intake_form ?? 0)) /
+        loc.first_visits *
+        10000
+      ) / 100
+      : 0);
+
+  const totalConversions = (loc: IntakeFormLocation) =>
+    loc.first_visit_conversions ??
+    ((loc.first_visit_conversions_with_intake_form ?? 0) +
+      (loc.first_visit_conversions_without_intake_form ?? 0));
+
   const chartData = (conversionData?.locations || [])
     .filter(
       (loc: IntakeFormLocation) =>
@@ -198,16 +228,24 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
     .map((loc: IntakeFormLocation) => ({
       name: loc.location_name.replace(/^StretchLab\s+/i, ""),
       location_name: loc.location_name,
-      intake_form_submission_rate: loc.intake_form_submission_rate ?? loc.conversion_percentage ?? 0,
-      conversion_rate_with_intake_form: loc.conversion_rate_with_intake_form ?? loc.matched_conversion_percentage ?? 0,
+      intake_form_submission_rate:
+        loc.first_visits_with_intake_form_rate ??
+        loc.intake_form_submission_rate ??
+        loc.conversion_percentage ??
+        0,
+      conversion_rate_with_intake_form:
+        loc.conversion_rate_with_intake_form ?? loc.matched_conversion_percentage ?? 0,
       conversion_rate_without_intake_form: loc.conversion_rate_without_intake_form ?? 0,
-      first_visits_with_intake_form: loc.first_visits_with_intake_form ?? loc.first_visits_from_intake_form ?? 0,
+      first_visits_with_intake_form:
+        loc.first_visits_with_intake_form ?? loc.first_visits_from_intake_form ?? 0,
       first_visit_conversions_with_intake_form: loc.first_visit_conversions_with_intake_form ?? 0,
       first_visits_without_intake_form: loc.first_visits_without_intake_form ?? 0,
       first_visit_conversions_without_intake_form: loc.first_visit_conversions_without_intake_form ?? 0,
       first_visits: loc.first_visits,
       intake_form_submissions: loc.intake_form_submissions,
-      value: loc.conversion_rate_with_intake_form ?? loc.matched_conversion_percentage ?? 0,
+      conversion_rate: overallRate(loc),
+      first_visit_conversions: totalConversions(loc),
+      value: overallRate(loc),
     }));
 
   return (
@@ -257,17 +295,30 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <DateRangeFilter
-            label="Duration"
-            value={
-              DURATION_OPTIONS.find((opt) => opt.value === duration)?.label || duration
-            }
-            options={DURATION_OPTIONS}
-            onChange={(val) => setDuration(val)}
-            onCustomRangeChange={handleCustomRangeChange}
-            showLabel={false}
-            className="w-44"
-          />
+          {chartTab === "trend" ? (
+            <FilterDropdown
+              label="Trend Window"
+              value={
+                WEEKS_OPTIONS.find((opt) => opt.value === String(weeks))?.label || `${weeks} Weeks`
+              }
+              options={WEEKS_OPTIONS}
+              onChange={(val) => setWeeks(parseInt(val, 10))}
+              showLabel={false}
+              className="w-44"
+            />
+          ) : (
+            <DateRangeFilter
+              label="Duration"
+              value={
+                DURATION_OPTIONS.find((opt) => opt.value === duration)?.label || duration
+              }
+              options={DURATION_OPTIONS}
+              onChange={(val) => setDuration(val)}
+              onCustomRangeChange={handleCustomRangeChange}
+              showLabel={false}
+              className="w-44"
+            />
+          )}
           <FilterDropdown
             label="Location"
             value={selectedLocation}
@@ -319,14 +370,16 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
                         </div>
                       </div>
                       <h3 className="text-2xl font-black text-dark-1 mb-1">
-                        {conversionData?.intake_form_submission_rate !== undefined
-                          ? `${conversionData.intake_form_submission_rate}%`
-                          : conversionData?.conversion_percentage !== undefined
-                            ? `${conversionData.conversion_percentage}%`
-                            : "0%"}
+                        {conversionData?.first_visits_with_intake_form_rate !== undefined
+                          ? `${conversionData.first_visits_with_intake_form_rate}%`
+                          : conversionData?.intake_form_submission_rate !== undefined
+                            ? `${conversionData.intake_form_submission_rate}%`
+                            : conversionData?.conversion_percentage !== undefined
+                              ? `${conversionData.conversion_percentage}%`
+                              : "0%"}
                       </h3>
                       <p className="text-[10px] text-grey-5 font-medium">
-                        Submissions / First Visits
+                        First visits with an intake form / First visits
                       </p>
                     </div>
                     <div className="mt-3 w-full bg-neutral-quaternary rounded-full h-1.5 overflow-hidden">
@@ -334,18 +387,31 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
                         className="bg-primary-base h-1.5 rounded-full transition-all duration-500"
                         style={{
                           width: `${Math.min(
-                            conversionData?.intake_form_submission_rate ?? conversionData?.conversion_percentage ?? 0,
+                            conversionData?.first_visits_with_intake_form_rate ??
+                            conversionData?.intake_form_submission_rate ??
+                            conversionData?.conversion_percentage ??
+                            0,
                             100
                           )}%`,
                         }}
                       />
                     </div>
+                    {/* {conversionData?.intake_forms_for_later_visits != null &&
+                      conversionData.intake_forms_for_later_visits > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-neutral-tertiary/60 flex items-center gap-1.5 text-[10px] text-primary-base font-bold">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>
+                            +{conversionData.intake_forms_for_later_visits} forms received for visits still to come
+                          </span>
+                        </div>
+                      )} */}
                   </div>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[220px] text-xs">
-                  Count of Intake Form Submissions / Count of First Visits.
+                  Share of first visits that had an intake form submitted.
                 </TooltipContent>
               </Tooltip>
+
 
               {/* Card 2: Conversion Rate WITH Intake Form */}
               <Tooltip>
@@ -489,9 +555,41 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
           </TooltipProvider>
 
 
-          {chartData.length > 0 ? (
-            <div className="bg-white p-6 rounded-3xl border border-neutral-tertiary shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-tertiary/60 pb-4">
+          {/* Chart Section with View Switcher */}
+          <div className="bg-white p-6 rounded-3xl border border-neutral-tertiary shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-tertiary/60 pb-4">
+              <div className="inline-flex p-1 bg-neutral-quaternary rounded-2xl text-xs font-bold border border-neutral-tertiary">
+                <button
+                  type="button"
+                  onClick={() => setChartTab("studios")}
+                  className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${chartTab === "studios"
+                    ? "bg-white text-dark-1 shadow-xs font-black border border-neutral-tertiary/60"
+                    : "text-grey-5 hover:text-dark-1"
+                    }`}
+                >
+                  Studio Breakdown ({DURATION_OPTIONS.find((opt) => opt.value === duration)?.label || duration})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartTab("trend")}
+                  className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${chartTab === "trend"
+                    ? "bg-white text-dark-1 shadow-xs font-black border border-neutral-tertiary/60"
+                    : "text-grey-5 hover:text-dark-1"
+                    }`}
+                >
+                  Rolling 4-Week Trend
+                </button>
+              </div>
+            </div>
+
+            {chartTab === "trend" ? (
+              <IntakeConversionTrendChart
+                selectedLocation={selectedLocation}
+                weeks={weeks}
+                isSmallScreen={isSmallScreen}
+              />
+            ) : chartData.length > 0 ? (
+              <div className="space-y-4">
                 <div>
                   <h3 className="text-base font-black text-dark-1">
                     Intake &amp; Conversion Performance by Studio Location
@@ -500,84 +598,85 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
                     Multi-metric comparison of intake submission rate vs. conversion rate with and without intake forms across locations.
                   </p>
                 </div>
-              </div>
 
-              <div className="h-[480px] w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={chartData}
-                    margin={{
-                      top: 15,
-                      right: isSmallScreen ? 15 : 30,
-                      left: isSmallScreen ? 15 : 30,
-                      bottom: 75,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      interval={isSmallScreen ? "preserveEnd" : 0}
-                      tick={<CustomizedAxisTick />}
-                      height={70}
-                      tickLine={false}
-                      axisLine={{ stroke: "#e2e8f0" }}
-                    />
-                    <YAxis
-                      domain={[0, 100]}
-                      unit="%"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }}
-                      width={42}
-                    />
-                    <RechartsTooltip
-                      cursor={{ stroke: "#cbd5e1", strokeWidth: 1, strokeDasharray: "3 3" }}
-                      content={<CustomTooltip />}
-                    />
-                    <Legend
-                      verticalAlign="top"
-                      align="right"
-                      iconType="circle"
-                      wrapperStyle={{ paddingBottom: 16, fontSize: 12, fontWeight: 700 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="intake_form_submission_rate"
-                      name="Intake Submission Rate"
-                      stroke="#368591"
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: "#368591", strokeWidth: 2, stroke: "#ffffff" }}
-                      activeDot={{ r: 8, stroke: "#368591", strokeWidth: 2 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="conversion_rate_with_intake_form"
-                      name="Conversion (w/ Intake)"
-                      stroke="#059669"
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: "#059669", strokeWidth: 2, stroke: "#ffffff" }}
-                      activeDot={{ r: 8, stroke: "#059669", strokeWidth: 2 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="conversion_rate_without_intake_form"
-                      name="Conversion (w/out Intake)"
-                      stroke="#d97706"
-                      strokeWidth={2.5}
-                      strokeDasharray="4 4"
-                      dot={{ r: 4.5, fill: "#d97706", strokeWidth: 2, stroke: "#ffffff" }}
-                      activeDot={{ r: 7, stroke: "#d97706", strokeWidth: 2 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="h-[480px] w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={chartData}
+                      margin={{
+                        top: 15,
+                        right: isSmallScreen ? 15 : 30,
+                        left: isSmallScreen ? 15 : 30,
+                        bottom: 75,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        interval={isSmallScreen ? "preserveEnd" : 0}
+                        tick={<CustomizedAxisTick />}
+                        height={70}
+                        tickLine={false}
+                        axisLine={{ stroke: "#e2e8f0" }}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        unit="%"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }}
+                        width={42}
+                      />
+                      <RechartsTooltip
+                        cursor={{ stroke: "#cbd5e1", strokeWidth: 1, strokeDasharray: "3 3" }}
+                        content={<CustomTooltip />}
+                      />
+                      <Legend
+                        verticalAlign="top"
+                        align="right"
+                        iconType="circle"
+                        wrapperStyle={{ paddingBottom: 16, fontSize: 12, fontWeight: 700 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="intake_form_submission_rate"
+                        name="Intake Submission Rate"
+                        stroke="#368591"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: "#368591", strokeWidth: 2, stroke: "#ffffff" }}
+                        activeDot={{ r: 8, stroke: "#368591", strokeWidth: 2 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="conversion_rate_with_intake_form"
+                        name="Conversion (w/ Intake)"
+                        stroke="#059669"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: "#059669", strokeWidth: 2, stroke: "#ffffff" }}
+                        activeDot={{ r: 8, stroke: "#059669", strokeWidth: 2 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="conversion_rate_without_intake_form"
+                        name="Conversion (w/out Intake)"
+                        stroke="#d97706"
+                        strokeWidth={2.5}
+                        strokeDasharray="4 4"
+                        dot={{ r: 4.5, fill: "#d97706", strokeWidth: 2, stroke: "#ffffff" }}
+                        activeDot={{ r: 7, stroke: "#d97706", strokeWidth: 2 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="bg-white p-8 rounded-3xl border border-neutral-tertiary shadow-xs text-center space-y-1.5">
-              <p className="text-sm font-black text-dark-1">No Studio Performance Data Available</p>
-              <p className="text-xs text-grey-5">There are no visits or intake submissions recorded for the selected filter range.</p>
-            </div>
-          )}
+            ) : (
+              <div className="p-8 text-center space-y-1.5">
+                <p className="text-sm font-black text-dark-1">No Studio Performance Data Available</p>
+                <p className="text-xs text-grey-5">There are no visits or intake submissions recorded for the selected filter range.</p>
+              </div>
+            )}
+          </div>
+
 
 
         </div>

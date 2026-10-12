@@ -1,4 +1,3 @@
-import React from "react";
 import {
   FileText,
   Target,
@@ -8,6 +7,7 @@ import {
   CheckCircle2,
   FileWarning,
   Info,
+  Loader2,
 } from "lucide-react";
 import { ActionBadge, ClientActionRow, localDay } from "../../service/clientActions";
 import {
@@ -26,6 +26,8 @@ interface ActionBadgeChipProps {
   onOpenNoteModal?: (row: ClientActionRow) => void;
   onLogMaps?: (row: ClientActionRow) => void;
   onLogBookNext?: (row: ClientActionRow, count?: number) => void;
+  isToggling?: boolean;
+  isLoggingAction?: boolean;
 }
 
 export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
@@ -36,6 +38,8 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
   onToggleFollowUp,
   onLogMaps,
   onLogBookNext,
+  isToggling,
+  isLoggingAction,
 }) => {
   const currentToday = todayStr || localDay();
   const isToday = row.booking_date === currentToday;
@@ -53,17 +57,20 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
             <TooltipTrigger asChild>
               <button
                 type="button"
+                disabled={isToggling}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleFollowUp(row);
                 }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer border disabled:opacity-50 ${
                   isReminded
                     ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
                     : "bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100 shadow-2xs"
                 }`}
               >
-                {isReminded ? (
+                {isToggling ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-current shrink-0" />
+                ) : isReminded ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 ) : (
                   <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -125,11 +132,12 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
             <TooltipTrigger asChild>
               <button
                 type="button"
+                disabled={isLoggingAction}
                 onClick={(e) => {
                   e.stopPropagation();
                   onLogMaps?.(row);
                 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs hover:bg-slate-200 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Target className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>MAPS</span>
@@ -182,11 +190,12 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
         return (
           <button
             type="button"
+            disabled={isLoggingAction}
             onClick={(e) => {
               e.stopPropagation();
               onLogBookNext?.(row, needed);
             }}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs cursor-pointer ${badgeStyle}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs cursor-pointer disabled:opacity-50 ${badgeStyle}`}
           >
             <CalendarDays className="w-3.5 h-3.5 shrink-0" />
             <span>{headline}</span>
@@ -200,11 +209,12 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
             <TooltipTrigger asChild>
               <button
                 type="button"
+                disabled={isLoggingAction}
                 onClick={(e) => {
                   e.stopPropagation();
                   onLogBookNext?.(row, needed);
                 }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-colors cursor-pointer shadow-2xs ${badgeStyle}`}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-colors cursor-pointer shadow-2xs disabled:opacity-50 ${badgeStyle}`}
               >
                 <CalendarDays className="w-3.5 h-3.5 shrink-0" />
                 <span>{headline}</span>
