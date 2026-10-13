@@ -167,6 +167,7 @@ export interface ActionEntry {
 export interface DeskStaffMember {
   id: number;
   name: string;
+  email?: string;
   accepted: boolean;
 }
 

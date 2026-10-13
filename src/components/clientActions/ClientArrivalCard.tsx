@@ -93,7 +93,11 @@ const ActionsTakenList: React.FC<{
         const isUndoable =
           entry.action === "maps" || entry.action === "book_next";
         const timeStr = entry.done_at ? formatUtcTime(entry.done_at) : "";
-        const staffName = entry.staff_name || entry.done_by_name || "Desk";
+        const staffName =
+          entry.staff_name ||
+          (entry.done_by_name && !/^\s*desk\s*$/i.test(entry.done_by_name)
+            ? entry.done_by_name
+            : "Admin");
         const checkStatus = entry.check?.status || "pending";
 
         let statusBadge = null;
@@ -225,7 +229,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
         }`}
     >
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Left Section: Avatar, Client Name, CR ID, Session & Staff */}
+        {/* Left Section: Avatar, Client Name, CR ID, Session & Staff*/}
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
           <div className="relative shrink-0">
             <div

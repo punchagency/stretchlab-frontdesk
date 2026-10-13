@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { renderSuccessToast, renderErrorToast } from "../../utils/toast";
+import { getUserInfo, hasRole } from "../../utils/user";
 
 interface ClientGoalModalProps {
   clubreadyUserId: string | null;
@@ -48,6 +49,7 @@ interface ClientGoalModalProps {
   initialGoal?: Goal | null;
   staffList?: DeskStaffMember[];
   activeStaffId?: number | null;
+  activeStaffMember?: DeskStaffMember | null;
   onSuccess?: () => void;
 }
 
@@ -63,24 +65,36 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
   initialGoal,
   staffList = [],
   activeStaffId = null,
+  activeStaffMember = null,
   onSuccess,
 }) => {
   const queryClient = useQueryClient();
+  const userInfo = getUserInfo();
   const [goalText, setGoalText] = useState("");
   const [whyText, setWhyText] = useState("");
-  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(activeStaffId);
+
+  const isAdmin = hasRole(userInfo, [1, 2, 4]);
+  const staffDisplayName =
+    activeStaffMember?.name ||
+    activeStaffMember?.email ||
+    staffList.find((s) => s.id === activeStaffId)?.name ||
+    (isAdmin ? "Admin" : (userInfo?.name || userInfo?.email || "Desk"));
+
+  const staffEmailTitle =
+    activeStaffMember?.email ||
+    userInfo?.email ||
+    undefined;
 
   // Sync state when modal opens or initialGoal changes
   useEffect(() => {
     if (isOpen) {
       setGoalText(initialGoal?.goal || row?.goal?.goal || "");
       setWhyText(initialGoal?.why || row?.goal?.why || "");
-      setSelectedStaffId(activeStaffId ?? null);
     } else {
       setGoalText("");
       setWhyText("");
     }
-  }, [isOpen, initialGoal, row, activeStaffId]);
+  }, [isOpen, initialGoal, row]);
 
   const {
     data: goalsResponse,
@@ -206,7 +220,7 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
     addGoalMutation.mutate({
       goal: currentGoal.goal,
       why: currentGoal.why || undefined,
-      staffId: selectedStaffId,
+      staffId: activeStaffId || undefined,
     });
   };
 
@@ -216,7 +230,7 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
     addGoalMutation.mutate({
       goal: goalText.trim(),
       why: whyText.trim(),
-      staffId: selectedStaffId,
+      staffId: activeStaffId || undefined,
     });
   };
 
@@ -541,38 +555,22 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
                   </p>
                 </div>
 
-                {/* Dropdown for Front Desk Staff Member & Submit Button */}
+                {/* Front Desk Staff Member & Submit Button */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-neutral-tertiary">
-                  {staffList.length > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <User className="w-3.5 h-3.5 text-grey-5 shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-grey-5 font-bold uppercase tracking-wider">
-                          Logged By (Front Desk):
-                        </span>
-                        <select
-                          value={selectedStaffId ?? ""}
-                          onChange={(e) =>
-                            setSelectedStaffId(
-                              e.target.value ? Number(e.target.value) : null
-                            )
-                          }
-                          className="px-2.5 py-1.5 bg-neutral-quaternary border border-neutral-tertiary rounded-xl text-xs font-bold text-dark-1 focus:outline-none focus:border-primary-base focus:ring-2 focus:ring-primary-base/20 transition-all cursor-pointer"
-                        >
-                          <option value="">Current Signed-in Account</option>
-                          {staffList.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} {!s.accepted ? "(invited)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-grey-5 shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-grey-5 font-bold uppercase tracking-wider">
+                        Logged By (Front Desk):
+                      </span>
+                      <span
+                        className="text-xs font-black text-dark-1 truncate max-w-[220px]"
+                        title={staffEmailTitle}
+                      >
+                        {staffDisplayName}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="text-[11px] text-grey-5 font-medium">
-                      Studio location: automatically linked to visit
-                    </div>
-                  )}
+                  </div>
 
                   <button
                     type="submit"
@@ -653,11 +651,14 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
                           </div>
                         )}
 
-                        {(entry.staff_name || entry.captured_by_name) && (
+                        {(entry.staff_name || entry.captured_by_name || entry.source === "front_desk") && (
                           <p className="text-[10px] text-grey-5">
                             Recorded by:{" "}
                             <span className="font-bold text-dark-1">
-                              {entry.staff_name || entry.captured_by_name}
+                              {entry.staff_name ||
+                                (entry.captured_by_name && !/^\s*desk\s*$/i.test(entry.captured_by_name)
+                                  ? entry.captured_by_name
+                                  : "Admin")}
                             </span>
                           </p>
                         )}

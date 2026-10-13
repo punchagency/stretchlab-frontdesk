@@ -3,6 +3,8 @@ import {
   Clock,
   CheckCircle2,
   ArrowDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   ClientActionRow,
@@ -84,12 +86,35 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   onClearFilters,
 }) => {
   const nextUpRef = useRef<HTMLDivElement | null>(null);
+  const quickNavRef = useRef<HTMLDivElement | null>(null);
 
   // Slot pagination state: default 5 time slots per page
   const [slotPage, setSlotPage] = useState(1);
   const [slotPageSize, setSlotPageSize] = useState(5);
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const hasAutoScrolledRef = useRef(false);
+
+  // Check whether quick navigation bar can scroll left or right
+  const checkScrollability = () => {
+    const el = quickNavRef.current;
+    if (el) {
+      const hasOverflow = el.scrollWidth > el.clientWidth + 2;
+      setCanScrollLeft(el.scrollLeft > 4);
+      setCanScrollRight(
+        hasOverflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 4
+      );
+    }
+  };
+
+  const scrollQuickNav = (direction: "left" | "right") => {
+    if (quickNavRef.current) {
+      const scrollAmount = direction === "left" ? -220 : 220;
+      quickNavRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+      setTimeout(checkScrollability, 300);
+    }
+  };
 
   // Reset pagination and auto-scroll flag when date changes
   useEffect(() => {
@@ -174,6 +199,14 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     };
   }, [bookings, selectedDate, todayStr]);
 
+  // Check scrollability on slots change or window resize
+  useEffect(() => {
+    checkScrollability();
+    const handleResize = () => checkScrollability();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [slots]);
+
   // Navigate & scroll to any specified slot
   const scrollToSlot = (timeKey: string) => {
     setActiveSlotKey(timeKey);
@@ -185,6 +218,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
       }
     }
 
+    // Scroll timeline slot into view
     const safeId = `timeline-slot-${timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
     const executeScroll = () => {
       const el =
@@ -200,6 +234,17 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     if (!executeScroll()) {
       setTimeout(executeScroll, 120);
       setTimeout(executeScroll, 300);
+    }
+
+    // Also center the pill in the quick nav bar
+    const pillId = `quick-nav-pill-${timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const pillEl = document.getElementById(pillId);
+    if (pillEl) {
+      pillEl.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
     }
   };
 
@@ -235,6 +280,17 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
           hasAutoScrolledRef.current = true;
           setActiveSlotKey(nextUpSlotKey);
         }
+
+        const pillId = `quick-nav-pill-${nextUpSlotKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        const pillEl = document.getElementById(pillId);
+        if (pillEl) {
+          pillEl.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        }
+        checkScrollability();
       }, 180);
 
       return () => clearTimeout(timer);
@@ -342,56 +398,90 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                 Click any slot to jump directly
               </span>
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-              {slots.map((slot) => {
-                const isCurrent = slot.isNextUp && selectedDate === todayStr;
-                const isSelected = activeSlotKey === slot.timeKey;
 
-                return (
-                  <button
-                    key={slot.timeKey}
-                    type="button"
-                    onClick={() => scrollToSlot(slot.timeKey)}
-                    className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isSelected
-                        ? "bg-primary-base text-white shadow-2xs ring-2 ring-primary-base/30"
-                        : isCurrent
-                        ? "bg-primary-base/15 text-primary-base border border-primary-base/30 font-black hover:bg-primary-base/20"
-                        : "bg-neutral-quaternary text-dark-1 hover:bg-neutral-tertiary/70 border border-neutral-tertiary"
-                    }`}
-                  >
-                    <span>{slot.displayTime}</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                        isSelected
-                          ? "bg-white/20 text-white"
+            {/* Scrollable slots track flanked by Left and Right navigation chevrons */}
+            <div className="relative flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => scrollQuickNav("left")}
+                disabled={!canScrollLeft}
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${canScrollLeft
+                    ? "bg-neutral-quaternary hover:bg-neutral-tertiary text-dark-1 border border-neutral-tertiary shadow-2xs cursor-pointer active:scale-95"
+                    : "bg-neutral-quaternary/40 text-grey-3 border border-neutral-tertiary/30 cursor-not-allowed opacity-40"
+                  }`}
+                title="Scroll slots left"
+                aria-label="Scroll slots left"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div
+                ref={quickNavRef}
+                onScroll={checkScrollability}
+                className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-thin scroll-smooth flex-1 min-w-0"
+              >
+                {slots.map((slot) => {
+                  const isCurrent = slot.isNextUp && selectedDate === todayStr;
+                  const isSelected = activeSlotKey === slot.timeKey;
+
+                  return (
+                    <button
+                      key={slot.timeKey}
+                      id={`quick-nav-pill-${slot.timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`}
+                      type="button"
+                      onClick={() => scrollToSlot(slot.timeKey)}
+                      className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
+                          ? "bg-primary-base text-white shadow-2xs ring-2 ring-primary-base/30"
                           : isCurrent
-                          ? "bg-primary-base text-white"
-                          : "bg-white text-grey-5 border border-neutral-tertiary"
-                      }`}
-                    >
-                      {slot.bookings.length}
-                    </span>
-                    {slot.actionCount > 0 && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isSelected
-                            ? "bg-amber-300"
-                            : isCurrent
-                            ? "bg-rose-500"
-                            : "bg-rose-500"
+                            ? "bg-primary-base/15 text-primary-base border border-primary-base/30 font-black hover:bg-primary-base/20"
+                            : "bg-neutral-quaternary text-dark-1 hover:bg-neutral-tertiary/70 border border-neutral-tertiary"
                         }`}
-                        title={`${slot.actionCount} action(s) required`}
-                      />
-                    )}
-                    {isCurrent && !isSelected && (
-                      <span className="text-[9px] font-black uppercase text-primary-base bg-primary-base/10 px-1 py-0.2 rounded">
-                        Now
+                    >
+                      <span>{slot.displayTime}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${isSelected
+                            ? "bg-white/20 text-white"
+                            : isCurrent
+                              ? "bg-primary-base text-white"
+                              : "bg-white text-grey-5 border border-neutral-tertiary"
+                          }`}
+                      >
+                        {slot.bookings.length}
                       </span>
-                    )}
-                  </button>
-                );
-              })}
+                      {slot.actionCount > 0 && (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${isSelected
+                              ? "bg-amber-300"
+                              : isCurrent
+                                ? "bg-rose-500"
+                                : "bg-rose-500"
+                            }`}
+                          title={`${slot.actionCount} action(s) required`}
+                        />
+                      )}
+                      {isCurrent && !isSelected && (
+                        <span className="text-[9px] font-black uppercase text-primary-base bg-primary-base/10 px-1 py-0.2 rounded">
+                          Now
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => scrollQuickNav("right")}
+                disabled={!canScrollRight}
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${canScrollRight
+                    ? "bg-neutral-quaternary hover:bg-neutral-tertiary text-dark-1 border border-neutral-tertiary shadow-2xs cursor-pointer active:scale-95"
+                    : "bg-neutral-quaternary/40 text-grey-3 border border-neutral-tertiary/30 cursor-not-allowed opacity-40"
+                  }`}
+                title="Scroll slots right"
+                aria-label="Scroll slots right"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -408,17 +498,16 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
               key={slot.timeKey}
               id={`timeline-slot-${slot.timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`}
               ref={isSlotNextUp ? nextUpRef : null}
-              className={`relative space-y-3 transition-all duration-300 scroll-mt-6 ${
-                isSlotActive ? "ring-2 ring-primary-base/20 rounded-2xl p-2 -m-2 bg-primary-base/[0.02]" : ""
-              }`}
+              className={`relative space-y-3 transition-all duration-300 scroll-mt-6 ${isSlotActive ? "ring-2 ring-primary-base/20 rounded-2xl p-2 -m-2 bg-primary-base/[0.02]" : ""
+                }`}
             >
               {/* Timeline Slot Header Node */}
               <div className="flex items-center gap-3">
                 {/* Timeline Node Dot / Icon */}
                 <div
                   className={`relative z-10 w-8 h-8 -ml-4 sm:-ml-8 rounded-full flex items-center justify-center transition-all ${isSlotNextUp
-                      ? "bg-primary-base text-white ring-4 ring-primary-base/20 shadow-md"
-                      : "bg-white text-grey-2 border-2 border-neutral-tertiary"
+                    ? "bg-primary-base text-white ring-4 ring-primary-base/20 shadow-md"
+                    : "bg-white text-grey-2 border-2 border-neutral-tertiary"
                     }`}
                 >
                   <Clock className="w-3.5 h-3.5" />

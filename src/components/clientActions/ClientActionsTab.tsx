@@ -16,7 +16,6 @@ import {
   Loader2,
   LayoutGrid,
   CheckCircle2,
-  UserCheck,
 } from "lucide-react";
 import {
   getClientActions,
@@ -31,7 +30,9 @@ import {
   logClientAction,
   undoClientAction,
   ActionEntry,
+  DeskStaffMember,
 } from "../../service/clientActions";
+import { getUserInfo, hasRole } from "../../utils/user";
 import {
   checkFollowUp,
   uncheckFollowUp,
@@ -84,8 +85,6 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const [badgeFilter, setBadgeFilter] = useState<BadgeFilterType>("all");
   const [viewMode, setViewMode] = useState<"timeline" | "cards">("timeline");
 
-  // Staff on Desk State
-  const [activeStaffId, setActiveStaffId] = useState<number | null>(null);
   const [undoingEntryId, setUndoingEntryId] = useState<number | null>(null);
 
   // Modals state
@@ -123,16 +122,31 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const deskStaffList = deskStaffResponse?.data?.staff || [];
   const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
 
-  // Preselect default staff on desk if available and activeStaffId hasn't been set
-  useEffect(() => {
-    if (
-      activeStaffId === null &&
-      defaultStaffId !== undefined &&
-      defaultStaffId !== null
-    ) {
-      setActiveStaffId(defaultStaffId);
+  // Resolve logged-in staff member from staff list:
+  // 1. If default_staff_id is provided by API, match by id.
+  // 2. If default_staff_id is null/not found, match by logged-in user's email against staff.email or staff.name
+  const currentStaff = useMemo<DeskStaffMember | null>(() => {
+    const userInfo = getUserInfo();
+    const loggedInEmail = userInfo?.email?.toLowerCase().trim() || "";
+
+    if (defaultStaffId !== null && defaultStaffId !== undefined) {
+      const found = deskStaffList.find((s) => s.id === defaultStaffId);
+      if (found) return found;
     }
-  }, [defaultStaffId, activeStaffId]);
+
+    if (loggedInEmail) {
+      const found = deskStaffList.find(
+        (s) =>
+          s.email?.toLowerCase().trim() === loggedInEmail ||
+          s.name?.toLowerCase().trim() === loggedInEmail
+      );
+      if (found) return found;
+    }
+
+    return null;
+  }, [deskStaffList, defaultStaffId]);
+
+  const activeStaffId = currentStaff?.id ?? defaultStaffId ?? null;
 
   // Main Data Query
   const {
@@ -149,6 +163,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     ],
     queryFn: () =>
       getClientActions(selectedDate, selectedLocation || undefined),
+
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: (failureCount, err: any) => {
@@ -312,8 +327,11 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
       if (previousData) {
+        const staffMember = deskStaffList.find((s) => s.id === activeStaffId);
+        const userInfo = getUserInfo();
         const staffMemberName =
-          deskStaffList.find((s) => s.id === activeStaffId)?.name || "You";
+          staffMember?.name ||
+          (hasRole(userInfo, [1, 2, 4]) ? "Admin" : (userInfo?.name || "Desk"));
 
         const updatedBookings = previousData.data.bookings.map((b) => {
           if (
@@ -454,7 +472,10 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
 
       if (previousData) {
         const staffMember = deskStaffList.find((s) => s.id === activeStaffId);
-        const staffMemberName = staffMember?.name || "You";
+        const userInfo = getUserInfo();
+        const staffMemberName =
+          staffMember?.name ||
+          (hasRole(userInfo, [1, 2, 4]) ? "Admin" : (userInfo?.name || "Desk"));
 
         const tempEntry: ActionEntry = {
           id: Date.now(),
@@ -469,7 +490,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           done_by: 0,
           done_by_name: staffMemberName,
           staff_id: activeStaffId || null,
-          staff_name: staffMemberName,
+          staff_name: staffMember ? staffMember.name : null,
           done_at: new Date().toISOString(),
           undone_at: null,
           undone_by: null,
@@ -502,22 +523,22 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             actions_taken: [tempEntry, ...(b.actions_taken || [])],
             ...(action === "maps"
               ? {
-                  maps: {
-                    ...b.maps,
-                    due: false,
-                    days_since_reading: 0,
-                    last_reading: "Completed today",
-                    reading_date: selectedDate,
-                  },
-                }
+                maps: {
+                  ...b.maps,
+                  due: false,
+                  days_since_reading: 0,
+                  last_reading: "Completed today",
+                  reading_date: selectedDate,
+                },
+              }
               : {}),
             ...(action === "book_next"
               ? {
-                  future_bookings: {
-                    ...b.future_bookings,
-                    count: (b.future_bookings?.count ?? 0) + (bookedCount ?? 1),
-                  },
-                }
+                future_bookings: {
+                  ...b.future_bookings,
+                  count: (b.future_bookings?.count ?? 0) + (bookedCount ?? 1),
+                },
+              }
               : {}),
           };
         });
@@ -682,10 +703,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-neutral-tertiary shadow-xs">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
           {/* Date Selector */}
-          <div
-            className={`${deskStaffList.length > 0 ? "md:col-span-4" : "md:col-span-5"
-              } flex flex-wrap items-center gap-2`}
-          >
+          <div className="md:col-span-5 flex flex-wrap items-center gap-2">
             <div className="inline-flex p-1 bg-neutral-quaternary rounded-xl border border-neutral-tertiary">
               <button
                 type="button"
@@ -733,11 +751,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           </div>
 
           {/* Location Selector */}
-          <div
-            className={
-              deskStaffList.length > 0 ? "md:col-span-3" : "md:col-span-3"
-            }
-          >
+          <div className="md:col-span-3">
             <div className="relative">
               <MapPin className="w-3.5 h-3.5 text-grey-5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
@@ -759,40 +773,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             </div>
           </div>
 
-          {/* Desk Staff Selector (shown when desk team members exist) */}
-          {deskStaffList.length > 0 && (
-            <div className="md:col-span-2">
-              <div className="relative">
-                <UserCheck className="w-3.5 h-3.5 text-grey-5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <select
-                  value={activeStaffId ?? ""}
-                  onChange={(e) =>
-                    setActiveStaffId(
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
-                  className="w-full pl-8 pr-8 py-2 bg-neutral-quaternary border border-neutral-tertiary rounded-xl text-xs font-bold text-dark-1 focus:outline-none focus:border-primary-base focus:ring-2 focus:ring-primary-base/20 appearance-none transition-all cursor-pointer truncate"
-                  title="Front Desk Team Member on Shift"
-                >
-                  <option value="">Desk: Signed In</option>
-                  {deskStaffList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                      {!s.accepted ? " (invited)" : ""}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-grey-5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-          )}
-
           {/* Search bar */}
-          <div
-            className={
-              deskStaffList.length > 0 ? "md:col-span-3" : "md:col-span-4"
-            }
-          >
+          <div className="md:col-span-4">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-grey-5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -1180,6 +1162,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         initialGoal={goalModalState.goal}
         staffList={deskStaffList}
         activeStaffId={activeStaffId}
+        activeStaffMember={currentStaff}
       />
 
       {/* Reusable Follow-up Note Slide-over Drawer */}
