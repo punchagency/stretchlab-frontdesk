@@ -11,6 +11,8 @@ import {
   Clock,
   Sparkles,
   Undo2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -29,6 +31,8 @@ import { getUserInfo } from "../../utils/user";
 
 export interface ClientArrivalCardProps {
   row: ClientActionRow;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   onGoalClick: (row: ClientActionRow) => void;
   onToggleFollowUp: (row: ClientActionRow) => void;
   onOpenNoteDrawer: (row: ClientActionRow) => void;
@@ -225,6 +229,8 @@ const ActionsTakenList: React.FC<{
 
 export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   row,
+  isCollapsed,
+  onToggleCollapse,
   onGoalClick,
   onToggleFollowUp,
   onOpenNoteDrawer,
@@ -242,6 +248,91 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
   const hasActions = row.badges.length > 0;
   const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
+  const isCompleted = row.badges.length === 0;
+
+  // Collapsed accordion strip (compact view when tasks are completed or slot is in the past)
+  if (isCollapsed) {
+    return (
+      <div
+        onClick={onToggleCollapse}
+        className={`group relative bg-white hover:bg-neutral-quaternary/50 rounded-xl px-3.5 py-2.5 border transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs hover:border-primary-base/40 ${
+          isCompleted
+            ? "border-emerald-200/90 bg-emerald-50/25"
+            : "border-neutral-tertiary"
+        }`}
+      >
+        {/* Left: Avatar, Client Name, Arrival time, First visit tag, Assigned flexologist */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-[10px] border shrink-0 ${
+              row.first_visit
+                ? "bg-primary-base text-white border-primary-base"
+                : "bg-primary-base/10 text-primary-base border-primary-base/20"
+            }`}
+          >
+            {getInitials(row.client_name)}
+          </div>
+
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="font-extrabold text-dark-1 text-xs sm:text-sm truncate">
+              {row.client_name || "Unknown Client"}
+            </span>
+
+            {(row.booking_start || row.booking_end) && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-grey-5 shrink-0">
+                <Clock className="w-3 h-3 text-grey-4" />
+                <span>{row.booking_start}</span>
+              </span>
+            )}
+
+            {row.first_visit && (
+              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-amber-100 text-amber-950 border border-amber-200 shrink-0">
+                1st Visit
+              </span>
+            )}
+
+            {row.booking_with && (
+              <span className="text-[11px] text-grey-4 hidden md:inline truncate">
+                · with {row.booking_with}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Status badge & Expand chevron */}
+        <div className="flex items-center gap-2 shrink-0">
+          {isCompleted ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+              <Check className="w-3 h-3 text-emerald-600" />
+              <span>All Tasks Done</span>
+              {row.actions_taken && row.actions_taken.length > 0 && (
+                <span className="text-emerald-800/80 font-bold ml-0.5">
+                  ({row.actions_taken.length} logged)
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+              <span>{row.badges.length} pending</span>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse?.();
+            }}
+            className="p-1 rounded-lg text-grey-4 hover:text-dark-1 hover:bg-neutral-tertiary/60 transition-colors cursor-pointer"
+            title="Expand client details & actions"
+            aria-label="Expand client details"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -460,6 +551,27 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
                 </TooltipProvider>
               )}
             </div>
+          )}
+
+          {/* Collapse Card Toggle Button */}
+          {onToggleCollapse && (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onToggleCollapse}
+                    className="p-2 rounded-xl border border-neutral-tertiary/70 bg-neutral-quaternary/40 hover:bg-neutral-quaternary hover:text-dark-1 text-grey-5 transition-all cursor-pointer shadow-2xs"
+                    aria-label="Collapse client card"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  <p className="font-semibold text-[11px]">Collapse Card</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>
