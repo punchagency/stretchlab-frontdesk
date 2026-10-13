@@ -32,7 +32,7 @@ import {
   ActionEntry,
   DeskStaffMember,
 } from "../../service/clientActions";
-import { getUserInfo, hasRole } from "../../utils/user";
+import { getUserInfo } from "../../utils/user";
 import {
   checkFollowUp,
   uncheckFollowUp,
@@ -128,18 +128,22 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const currentStaff = useMemo<DeskStaffMember | null>(() => {
     const userInfo = getUserInfo();
     const loggedInEmail = userInfo?.email?.toLowerCase().trim() || "";
+    const loggedInUsername = userInfo?.username?.toLowerCase().trim() || "";
 
     if (defaultStaffId !== null && defaultStaffId !== undefined) {
       const found = deskStaffList.find((s) => s.id === defaultStaffId);
       if (found) return found;
     }
 
-    if (loggedInEmail) {
-      const found = deskStaffList.find(
-        (s) =>
-          s.email?.toLowerCase().trim() === loggedInEmail ||
-          s.name?.toLowerCase().trim() === loggedInEmail
-      );
+    if (loggedInEmail || loggedInUsername) {
+      const found = deskStaffList.find((s) => {
+        const sEmail = s.email?.toLowerCase().trim();
+        const sName = s.name?.toLowerCase().trim();
+        return (
+          (loggedInEmail && (sEmail === loggedInEmail || sName === loggedInEmail)) ||
+          (loggedInUsername && (sEmail === loggedInUsername || sName === loggedInUsername))
+        );
+      });
       if (found) return found;
     }
 
@@ -327,11 +331,15 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
       if (previousData) {
-        const staffMember = deskStaffList.find((s) => s.id === activeStaffId);
+        const staffMember =
+          deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
         const userInfo = getUserInfo();
         const staffMemberName =
           staffMember?.name ||
-          (hasRole(userInfo, [1, 2, 4]) ? "Admin" : (userInfo?.name || "Desk"));
+          staffMember?.email ||
+          userInfo?.name ||
+          userInfo?.email ||
+          "Front Desk";
 
         const updatedBookings = previousData.data.bookings.map((b) => {
           if (
@@ -471,11 +479,15 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
       if (previousData) {
-        const staffMember = deskStaffList.find((s) => s.id === activeStaffId);
+        const staffMember =
+          deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
         const userInfo = getUserInfo();
         const staffMemberName =
           staffMember?.name ||
-          (hasRole(userInfo, [1, 2, 4]) ? "Admin" : (userInfo?.name || "Desk"));
+          staffMember?.email ||
+          userInfo?.name ||
+          userInfo?.email ||
+          "Front Desk";
 
         const tempEntry: ActionEntry = {
           id: Date.now(),
@@ -490,7 +502,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           done_by: 0,
           done_by_name: staffMemberName,
           staff_id: activeStaffId || null,
-          staff_name: staffMember ? staffMember.name : null,
+          staff_name: staffMember ? (staffMember.name || staffMember.email || null) : staffMemberName,
           done_at: new Date().toISOString(),
           undone_at: null,
           undone_by: null,

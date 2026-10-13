@@ -504,10 +504,35 @@ export const sendIntakeEmail = async (submissionId: number | string) => {
   );
   return response.data;
 };
-
 export const previewIntakeEmail = async (submissionId: number | string) => {
   const response = await api.get<IntakeEmailPreviewResponse>(
     `/frontdesk/intake/${submissionId}/email-preview`
+  );
+  return response.data;
+};
+
+export interface SendIntakeEmailToResponse {
+  status: string;
+  message: string;
+  data: {
+    submission_id: number;
+    recipients: string[];
+    failed: { email: string; error: string }[];
+    location_id: string;
+    location_name: string;
+    client_name: string;
+    subject: string;
+    summary_included: boolean;
+  };
+}
+
+export const sendIntakeEmailTo = async (
+  submissionId: number | string,
+  emails: string[]
+) => {
+  const response = await api.post<SendIntakeEmailToResponse>(
+    `/frontdesk/intake/${submissionId}/email-to`,
+    { emails }
   );
   return response.data;
 };

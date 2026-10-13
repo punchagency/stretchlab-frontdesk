@@ -12,9 +12,11 @@ import {
   Sparkles,
   Undo2,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ClientActionRow,
   ActionEntry,
+  getDeskStaff,
 } from "../../service/clientActions";
 import { ActionBadgeChip } from "./ActionBadgeChip";
 import {
@@ -23,6 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import { getUserInfo } from "../../utils/user";
 
 export interface ClientArrivalCardProps {
   row: ClientActionRow;
@@ -84,6 +87,16 @@ const ActionsTakenList: React.FC<{
 }> = ({ actions, onUndoAction, undoingEntryId }) => {
   if (!actions || actions.length === 0) return null;
 
+  const { data: deskStaffResponse } = useQuery({
+    queryKey: ["frontdesk-staff"],
+    queryFn: () => getDeskStaff(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const staffList = deskStaffResponse?.data?.staff || [];
+  const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
+  const defaultStaff = staffList.find((s) => s.id === defaultStaffId);
+  const userInfo = getUserInfo();
+
   return (
     <div className="mt-2 pt-2 border-t border-neutral-tertiary/60 flex flex-wrap items-center gap-1.5">
       <span className="text-[10px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
@@ -93,11 +106,20 @@ const ActionsTakenList: React.FC<{
         const isUndoable =
           entry.action === "maps" || entry.action === "book_next";
         const timeStr = entry.done_at ? formatUtcTime(entry.done_at) : "";
+        const matchedStaff = entry.staff_id
+          ? staffList.find((s) => s.id === entry.staff_id)
+          : null;
         const staffName =
           entry.staff_name ||
+          matchedStaff?.name ||
+          matchedStaff?.email ||
           (entry.done_by_name && !/^\s*desk\s*$/i.test(entry.done_by_name)
             ? entry.done_by_name
-            : "Admin");
+            : (defaultStaff?.name ||
+               defaultStaff?.email ||
+               userInfo?.name ||
+               userInfo?.email ||
+               "Front Desk"));
         const checkStatus = entry.check?.status || "pending";
 
         let statusBadge = null;

@@ -22,6 +22,7 @@ import {
 import {
   getClientGoals,
   addClientGoal,
+  getDeskStaff,
   Goal,
   GoalEntry,
   GoalSource,
@@ -35,7 +36,7 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { renderSuccessToast, renderErrorToast } from "../../utils/toast";
-import { getUserInfo, hasRole } from "../../utils/user";
+import { getUserInfo } from "../../utils/user";
 
 interface ClientGoalModalProps {
   clubreadyUserId: string | null;
@@ -73,15 +74,37 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
   const [goalText, setGoalText] = useState("");
   const [whyText, setWhyText] = useState("");
 
-  const isAdmin = hasRole(userInfo, [1, 2, 4]);
+  const { data: deskStaffResponse } = useQuery({
+    queryKey: ["frontdesk-staff"],
+    queryFn: () => getDeskStaff(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const availableStaffList =
+    staffList.length > 0 ? staffList : (deskStaffResponse?.data?.staff || []);
+  const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
+
+  const resolvedStaffId =
+    activeStaffId ?? defaultStaffId ?? activeStaffMember?.id ?? null;
+
+  const resolvedStaffMember =
+    activeStaffMember ||
+    (resolvedStaffId
+      ? availableStaffList.find((s) => s.id === resolvedStaffId)
+      : null) ||
+    (defaultStaffId
+      ? availableStaffList.find((s) => s.id === defaultStaffId)
+      : null);
+
   const staffDisplayName =
-    activeStaffMember?.name ||
-    activeStaffMember?.email ||
-    staffList.find((s) => s.id === activeStaffId)?.name ||
-    (isAdmin ? "Admin" : (userInfo?.name || userInfo?.email || "Desk"));
+    resolvedStaffMember?.name ||
+    resolvedStaffMember?.email ||
+    userInfo?.name ||
+    userInfo?.email ||
+    "Front Desk";
 
   const staffEmailTitle =
-    activeStaffMember?.email ||
+    resolvedStaffMember?.email ||
     userInfo?.email ||
     undefined;
 
@@ -220,7 +243,7 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
     addGoalMutation.mutate({
       goal: currentGoal.goal,
       why: currentGoal.why || undefined,
-      staffId: activeStaffId || undefined,
+      staffId: resolvedStaffId || undefined,
     });
   };
 
@@ -230,7 +253,7 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
     addGoalMutation.mutate({
       goal: goalText.trim(),
       why: whyText.trim(),
-      staffId: activeStaffId || undefined,
+      staffId: resolvedStaffId || undefined,
     });
   };
 
@@ -656,9 +679,11 @@ export const ClientGoalModal: React.FC<ClientGoalModalProps> = ({
                             Recorded by:{" "}
                             <span className="font-bold text-dark-1">
                               {entry.staff_name ||
+                                (entry.staff_id && availableStaffList.find((s) => s.id === entry.staff_id)?.name) ||
+                                (entry.staff_id && availableStaffList.find((s) => s.id === entry.staff_id)?.email) ||
                                 (entry.captured_by_name && !/^\s*desk\s*$/i.test(entry.captured_by_name)
                                   ? entry.captured_by_name
-                                  : "Admin")}
+                                  : staffDisplayName)}
                             </span>
                           </p>
                         )}

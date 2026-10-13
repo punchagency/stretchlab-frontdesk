@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target } from "lucide-react";
+import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target, FileText } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
@@ -20,6 +20,11 @@ const menuItems = [
     title: "Client Actions",
     path: "/",
     icon: Target,
+  },
+  {
+    title: "Client Intakes",
+    path: "/client-intakes",
+    icon: FileText,
   },
   {
     title: "First Visits",
