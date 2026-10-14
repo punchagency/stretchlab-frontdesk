@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,7 +16,8 @@ import {
   VisitKey,
   FrontdeskHomeResponse,
 } from "../service/home";
-import { getUserCookie } from "../utils/user";
+import { getUserCookie, getUserInfo } from "../utils/user";
+import { getDeskStaff, DeskStaffMember } from "../service/clientActions";
 import {
   FileText,
   MapPin,
@@ -291,6 +292,43 @@ export const Home = () => {
     setPage(1);
   };
 
+  // Desk Staff Query for resolving active team member
+  const { data: deskStaffResponse } = useQuery({
+    queryKey: ["frontdesk-staff"],
+    queryFn: () => getDeskStaff(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const deskStaffList = deskStaffResponse?.data?.staff || [];
+  const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
+
+  const currentStaff = useMemo<DeskStaffMember | null>(() => {
+    const userInfo = getUserInfo();
+    const loggedInEmail = userInfo?.email?.toLowerCase().trim() || "";
+    const loggedInUsername = userInfo?.username?.toLowerCase().trim() || "";
+
+    if (defaultStaffId !== null && defaultStaffId !== undefined) {
+      const found = deskStaffList.find((s) => s.id === defaultStaffId);
+      if (found) return found;
+    }
+
+    if (loggedInEmail || loggedInUsername) {
+      const found = deskStaffList.find((s) => {
+        const sEmail = s.email?.toLowerCase().trim();
+        const sName = s.name?.toLowerCase().trim();
+        return (
+          (loggedInEmail && (sEmail === loggedInEmail || sName === loggedInEmail)) ||
+          (loggedInUsername && (sEmail === loggedInUsername || sName === loggedInUsername))
+        );
+      });
+      if (found) return found;
+    }
+
+    return null;
+  }, [deskStaffList, defaultStaffId]);
+
+  const activeStaffId = currentStaff?.id ?? defaultStaffId ?? null;
+
   // Follow-up mutation with instant Optimistic UI updates
   const followUpMutation = useMutation({
     mutationFn: async ({
@@ -303,9 +341,9 @@ export const Home = () => {
       note?: string;
     }) => {
       if (!shouldCheck) {
-        return await uncheckFollowUp(visitKey);
+        return await uncheckFollowUp(visitKey, activeStaffId || undefined);
       } else {
-        return await checkFollowUp(visitKey, note);
+        return await checkFollowUp(visitKey, note, activeStaffId || undefined);
       }
     },
     onMutate: async ({ visitKey, shouldCheck, note }) => {
@@ -316,6 +354,16 @@ export const Home = () => {
       ]);
 
       if (previousData) {
+        const staffMember =
+          deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
+        const userInfo = getUserInfo();
+        const staffMemberName =
+          staffMember?.name ||
+          staffMember?.email ||
+          userInfo?.name ||
+          userInfo?.email ||
+          "Front Desk";
+
         const updatedFirstTimers = previousData.first_timers.map((ft) => {
           if (
             ft.location_id === visitKey.location_id &&
@@ -328,7 +376,9 @@ export const Home = () => {
                 checked: true,
                 checked_at: new Date().toISOString(),
                 checked_by: null,
-                checked_by_name: "You",
+                checked_by_name: staffMemberName,
+                staff_id: activeStaffId || null,
+                staff_name: staffMember ? (staffMember.name || staffMember.email || null) : staffMemberName,
                 note: note !== undefined ? note : ft.follow_up?.note || null,
               };
             return { ...ft, follow_up: newFollowUp };

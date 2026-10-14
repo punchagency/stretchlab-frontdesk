@@ -250,11 +250,10 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab("custom")}
-              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "custom"
+              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${activeTab === "custom"
                   ? "bg-white text-primary-base shadow-xs"
                   : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
-              }`}
+                }`}
             >
               <Send className="w-3.5 h-3.5" />
               <span>Send to People ({emails.length}/20)</span>
@@ -262,11 +261,10 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab("studio")}
-              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "studio"
+              className={`px-4 py-2 text-xs font-extrabold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${activeTab === "studio"
                   ? "bg-white text-primary-base shadow-xs"
                   : "text-grey-5 hover:text-dark-1 hover:bg-white/50"
-              }`}
+                }`}
             >
               <Building2 className="w-3.5 h-3.5" />
               <span>Send to Studio Mailbox</span>
@@ -297,9 +295,8 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
                     Recipient Email Addresses:
                   </label>
                   <span
-                    className={`text-[11px] font-mono font-bold ${
-                      emails.length >= 20 ? "text-rose-600" : "text-grey-5"
-                    }`}
+                    className={`text-[11px] font-mono font-bold ${emails.length >= 20 ? "text-rose-600" : "text-grey-5"
+                      }`}
                   >
                     {emails.length} / 20 max
                   </span>
@@ -316,11 +313,10 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
                     return (
                       <span
                         key={idx}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all shadow-2xs ${
-                          isInvalid
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all shadow-2xs ${isInvalid
                             ? "bg-rose-100 text-rose-800 border border-rose-300"
                             : "bg-white text-dark-1 border border-neutral-tertiary/90 hover:border-primary-base/40"
-                        }`}
+                          }`}
                       >
                         <span className="font-mono text-[11px]">{email}</span>
                         {isInvalid && (
@@ -351,8 +347,8 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
                       emails.length === 0
                         ? "Type or paste email addresses (press Enter, Comma, or Space)..."
                         : emails.length < 20
-                        ? "Add another email..."
-                        : "Limit reached (20 recipients)"
+                          ? "Add another email..."
+                          : "Limit reached (20 recipients)"
                     }
                     disabled={emails.length >= 20 || isSending}
                     className="flex-1 min-w-[220px] bg-transparent border-none text-xs sm:text-sm text-dark-1 focus:outline-none placeholder:text-grey-2 font-medium py-1 px-1"
@@ -422,22 +418,20 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setPreviewTab("html")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                    previewTab === "html"
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${previewTab === "html"
                       ? "bg-white text-primary-base shadow-2xs font-extrabold"
                       : "text-grey-5 hover:text-dark-1"
-                  }`}
+                    }`}
                 >
                   HTML Preview
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewTab("text")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                    previewTab === "text"
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${previewTab === "text"
                       ? "bg-white text-primary-base shadow-2xs font-extrabold"
                       : "text-grey-5 hover:text-dark-1"
-                  }`}
+                    }`}
                 >
                   Plain Text
                 </button>
@@ -498,7 +492,7 @@ export const SendIntakePeopleModal: React.FC<SendIntakePeopleModalProps> = ({
                 {isSending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Dispatching Emails...</span>
+                    <span>Sending Emails...</span>
                   </>
                 ) : (
                   <>

@@ -14,6 +14,8 @@ import {
   ClientActionRow,
   ActionEntry,
   actionRowKey,
+  isRowCompleted,
+  getRowPendingActionsCount,
 } from "../../service/clientActions";
 import { ClientArrivalCard } from "./ClientArrivalCard";
 import { ClientActionsPagination } from "./ClientActionsPagination";
@@ -161,7 +163,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
         const minutes =
           timeKey === "Unscheduled" ? 99999 : parseTimeToMinutes(timeKey);
         const actionCount = slotBookings.reduce(
-          (acc, b) => acc + b.badges.length,
+          (acc, b) => acc + getRowPendingActionsCount(b),
           0
         );
         const firstVisitCount = slotBookings.filter(
@@ -172,7 +174,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
 
         const isPast =
           isToday && minutes !== 99999 && minutes < currentMinutes;
-        const isAllComplete = actionCount === 0;
+        const isAllComplete = slotBookings.every(isRowCompleted);
 
         return {
           timeKey,
@@ -196,9 +198,9 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     if (isToday && parsedSlots.length > 0) {
       const scheduledSlots = parsedSlots.filter((s) => s.minutes !== 99999);
       if (scheduledSlots.length > 0) {
-        // Select slot currently in progress (within 30 mins after start) or earliest upcoming slot
+        // Select earliest upcoming arrival slot for today
         const nextSlot = scheduledSlots.find(
-          (s) => s.minutes >= currentMinutes - 30
+          (s) => s.minutes >= currentMinutes
         );
         if (nextSlot) {
           foundNextUpKey = nextSlot.timeKey;
@@ -213,7 +215,10 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
       }
     }
 
-    const totalActions = bookings.reduce((acc, b) => acc + b.badges.length, 0);
+    const totalActions = bookings.reduce(
+      (acc, b) => acc + getRowPendingActionsCount(b),
+      0
+    );
 
     return {
       slots: parsedSlots,
@@ -258,7 +263,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
       return cardOverrides[cardKey];
     }
     if (!focusMode) return false;
-    const isClientComplete = booking.badges.length === 0;
+    const isClientComplete = isRowCompleted(booking);
     return slot.isPast || isClientComplete;
   };
 
@@ -714,9 +719,12 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                   {slot.bookings.map((booking, idx) => {
                     const key = actionRowKey(booking, idx);
                     const cardCollapsed = isCardCollapsed(booking, slot, key);
-                    const isToggling =
-                      togglingRowKey ===
-                      (booking.clubready_user_id || booking.booking_id);
+                    const isToggling = Boolean(
+                      togglingRowKey &&
+                        (togglingRowKey === booking.clubready_user_id ||
+                          togglingRowKey === booking.booking_id ||
+                          togglingRowKey === actionRowKey(booking, idx))
+                    );
 
                     return (
                       <ClientArrivalCard

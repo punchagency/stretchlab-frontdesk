@@ -31,6 +31,7 @@ import {
   undoClientAction,
   ActionEntry,
   DeskStaffMember,
+  isRowCompleted,
 } from "../../service/clientActions";
 import { getUserInfo } from "../../utils/user";
 import {
@@ -220,7 +221,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           (b) => b.goal?.on_file === true || Boolean(b.goal?.goal)
         );
       } else if (badgeFilter === "no_actions") {
-        result = result.filter((b) => b.badges.length === 0);
+        result = result.filter(isRowCompleted);
       } else {
         result = result.filter((b) =>
           b.badges.includes(badgeFilter as ActionBadge)
@@ -250,7 +251,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   }, [bookings, badgeFilter, search]);
 
   const allClearCount = useMemo(
-    () => bookings.filter((b) => b.badges.length === 0).length,
+    () => bookings.filter(isRowCompleted).length,
     [bookings]
   );
 
@@ -330,65 +331,169 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       const previousData =
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
-      if (previousData) {
-        const staffMember =
-          deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
-        const userInfo = getUserInfo();
-        const staffMemberName =
-          staffMember?.name ||
-          staffMember?.email ||
-          userInfo?.name ||
-          userInfo?.email ||
-          "Front Desk";
+      const staffMember =
+        deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
+      const userInfo = getUserInfo();
+      const staffMemberName =
+        staffMember?.name ||
+        staffMember?.email ||
+        userInfo?.name ||
+        userInfo?.email ||
+        "Front Desk";
 
-        const updatedBookings = previousData.data.bookings.map((b) => {
-          if (
-            b.clubready_user_id === row.clubready_user_id &&
-            b.intake?.location_id === row.intake?.location_id
-          ) {
-            const newFollowUp: FollowUp | null = uncheck
-              ? null
-              : {
-                checked: true,
-                checked_at: new Date().toISOString(),
-                checked_by: null,
-                checked_by_name: staffMemberName,
-                note:
-                  note !== undefined
-                    ? note
-                    : b.intake?.follow_up?.note || null,
-              };
-            return {
-              ...b,
-              intake: b.intake ? { ...b.intake, follow_up: newFollowUp } : null,
+      const tempIntakeEntry: ActionEntry = {
+        id: Date.now(),
+        action: "intake_form",
+        booking_date: selectedDate,
+        booking_id: row.booking_id || null,
+        location_name: row.location_name || null,
+        store_id: row.intake?.location_id || null,
+        booked_count: null,
+        client_goal_id: null,
+        note: note !== undefined ? note : row.intake?.follow_up?.note || null,
+        done_by: 0,
+        done_by_name: staffMemberName,
+        staff_id: activeStaffId || null,
+        staff_name: staffMember ? (staffMember.name || staffMember.email || null) : staffMemberName,
+        done_at: new Date().toISOString(),
+        undone_at: null,
+        undone_by: null,
+        undone_by_name: null,
+        undone_staff_id: null,
+        undone_staff_name: null,
+        check: {
+          status: "pending",
+          reason: "text_not_recorded",
+          evidence: {
+            form_received: false,
+            submitted_at: null,
+          },
+        },
+      };
+
+      const updateBookingList = (bookings: ClientActionRow[]) => {
+        return bookings.map((b) => {
+          const isSameRow =
+            (row.booking_id != null && b.booking_id != null && String(b.booking_id) === String(row.booking_id)) ||
+            (row.clubready_user_id != null && b.clubready_user_id != null && String(b.clubready_user_id) === String(row.clubready_user_id));
+
+          if (!isSameRow) return b;
+
+          const newFollowUp: FollowUp | null = uncheck
+            ? null
+            : {
+              checked: true,
+              checked_at: new Date().toISOString(),
+              checked_by: null,
+              checked_by_name: staffMemberName,
+              note:
+                note !== undefined
+                  ? note
+                  : b.intake?.follow_up?.note || null,
             };
-          }
-          return b;
-        });
 
-        const updatedFollowedUpCount = updatedBookings.filter(
-          (b) => b.intake?.follow_up?.checked
-        ).length;
+          const remainingActions = (b.actions_taken || []).filter(
+            (a) => a.action !== "intake_form"
+          );
+          const newActionsTaken = uncheck
+            ? remainingActions
+            : [tempIntakeEntry, ...remainingActions];
+
+          let hasIntakeItem = false;
+          let updatedMustGet = b.must_get ? [...b.must_get] : [];
+          updatedMustGet = updatedMustGet.map((item) => {
+            if (item.action === "intake_form") {
+              hasIntakeItem = true;
+              return {
+                ...item,
+                badges: uncheck ? ["intake_form_missing"] : [],
+                done: !uncheck,
+                can_undo: !uncheck,
+                entry: uncheck ? null : tempIntakeEntry,
+              };
+            }
+            return item;
+          });
+
+          if (!hasIntakeItem) {
+            updatedMustGet.unshift({
+              action: "intake_form",
+              badges: uncheck ? (["intake_form_missing"] as ActionBadge[]) : ([] as ActionBadge[]),
+              done: !uncheck,
+              can_undo: !uncheck,
+              entry: uncheck ? null : tempIntakeEntry,
+            });
+          }
+
+          const updatedBadges: ActionBadge[] = uncheck
+            ? (b.badges.includes("intake_form_missing")
+                ? b.badges
+                : ["intake_form_missing" as ActionBadge, ...b.badges])
+            : b.badges.filter((badge) => badge !== "intake_form_missing");
+
+          return {
+            ...b,
+            badges: updatedBadges,
+            intake: b.intake ? { ...b.intake, follow_up: newFollowUp } : null,
+            actions_taken: newActionsTaken,
+            must_get: updatedMustGet,
+          };
+        });
+      };
+
+      if (previousData) {
+        const updatedBookings = updateBookingList(previousData.data.bookings);
+
+        const summary = { ...previousData.data.summary };
+        summary.intake_followed_up = Math.max(
+          0,
+          (summary.intake_followed_up || 0) + (uncheck ? -1 : 1)
+        );
+        summary.intake_form_missing = Math.max(
+          0,
+          (summary.intake_form_missing || 0) + (uncheck ? 1 : -1)
+        );
+        if (summary.actions_taken) {
+          summary.actions_taken = {
+            ...summary.actions_taken,
+            intake_form: Math.max(
+              0,
+              (summary.actions_taken.intake_form || 0) + (uncheck ? -1 : 1)
+            ),
+          };
+        }
 
         queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
           ...previousData,
           data: {
             ...previousData.data,
             bookings: updatedBookings,
-            summary: {
-              ...previousData.data.summary,
-              intake_followed_up: updatedFollowedUpCount,
-            },
+            summary,
           },
         });
+
+        queryClient.setQueriesData<ClientActionsResponse>(
+          { queryKey: ["frontdesk-client-actions", selectedDate] },
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                bookings: updateBookingList(old.data.bookings),
+                summary,
+              },
+            };
+          }
+        );
 
         // Keep local drawer state in sync if modal is open for this row
         if (
           noteModalVisit &&
-          noteModalVisit.row.clubready_user_id === row.clubready_user_id
+          String(noteModalVisit.row.clubready_user_id) === String(row.clubready_user_id)
         ) {
           const updatedRow = updatedBookings.find(
-            (b) => b.clubready_user_id === row.clubready_user_id
+            (b) => String(b.clubready_user_id) === String(row.clubready_user_id)
           );
           if (updatedRow) {
             setNoteModalVisit((prev) =>
@@ -442,8 +547,9 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
 
   const handleToggleRowFollowUp = (row: ClientActionRow) => {
     if (!row.intake || !row.clubready_user_id) return;
-    const isChecked = Boolean(row.intake.follow_up?.checked);
-    const key = actionRowKey(row, 0);
+    const mustGetItem = row.must_get?.find((m) => m.action === "intake_form");
+    const isChecked = mustGetItem ? Boolean(mustGetItem.done) : Boolean(row.intake.follow_up?.checked);
+    const key = row.clubready_user_id || row.booking_id || actionRowKey(row, 0);
     setTogglingRowKey(key);
 
     toggleFollowUpMutation.mutate({ row, uncheck: isChecked });
@@ -533,6 +639,17 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             ...b,
             badges: updatedBadges,
             actions_taken: [tempEntry, ...(b.actions_taken || [])],
+            must_get: b.must_get?.map((item) => {
+              if (item.action === action) {
+                return {
+                  ...item,
+                  done: true,
+                  entry: tempEntry,
+                  can_undo: true,
+                };
+              }
+              return item;
+            }),
             ...(action === "maps"
               ? {
                 maps: {
@@ -629,18 +746,125 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
       if (previousData) {
-        const updatedBookings = previousData.data.bookings.map((b) => ({
-          ...b,
-          actions_taken: (b.actions_taken || []).filter((a) => a.id !== entryId),
-        }));
+        // Identify which entry and action is being undone
+        let undoneAction: string | null = null;
+        let undoneClientId: string | null = null;
+        for (const booking of previousData.data.bookings) {
+          const matchedEntry =
+            booking.actions_taken?.find((a) => String(a.id) === String(entryId)) ||
+            booking.must_get?.find((m) => m.entry && String(m.entry.id) === String(entryId))?.entry;
+          if (matchedEntry) {
+            undoneAction = matchedEntry.action;
+            undoneClientId = booking.clubready_user_id ? String(booking.clubready_user_id) : null;
+            break;
+          }
+        }
+
+        const isIntakeAction = undoneAction === "intake_form";
+
+        const updateBookingList = (bookings: ClientActionRow[]) => {
+          return bookings.map((b) => {
+            const bClientId = b.clubready_user_id ? String(b.clubready_user_id) : null;
+            const isTargetClient =
+              (undoneClientId && bClientId === undoneClientId) ||
+              b.actions_taken?.some((a) => String(a.id) === String(entryId)) ||
+              b.must_get?.some((m) => m.entry && String(m.entry.id) === String(entryId));
+
+            const remainingActions = (b.actions_taken || []).filter(
+              (a) => String(a.id) !== String(entryId) && !(isTargetClient && isIntakeAction && a.action === "intake_form")
+            );
+
+            let hasIntakeItem = false;
+            let updatedMustGet = b.must_get ? [...b.must_get] : [];
+            updatedMustGet = updatedMustGet.map((item) => {
+              if (
+                (item.entry && String(item.entry.id) === String(entryId)) ||
+                (isTargetClient && isIntakeAction && item.action === "intake_form")
+              ) {
+                hasIntakeItem = true;
+                return {
+                  ...item,
+                  badges: item.badges.includes("intake_form_missing")
+                    ? item.badges
+                    : ["intake_form_missing", ...item.badges],
+                  done: false,
+                  entry: null,
+                  can_undo: false,
+                };
+              }
+              return item;
+            });
+
+            if (isTargetClient && isIntakeAction && !hasIntakeItem) {
+              updatedMustGet.unshift({
+                action: "intake_form",
+                badges: ["intake_form_missing" as ActionBadge],
+                done: false,
+                entry: null,
+                can_undo: false,
+              });
+            }
+
+            const updatedBadges: ActionBadge[] = isTargetClient && isIntakeAction
+              ? (b.badges.includes("intake_form_missing")
+                  ? b.badges
+                  : ["intake_form_missing" as ActionBadge, ...b.badges])
+              : b.badges;
+
+            return {
+              ...b,
+              badges: updatedBadges,
+              actions_taken: remainingActions,
+              must_get: updatedMustGet,
+              ...(isTargetClient && isIntakeAction && b.intake
+                ? {
+                    intake: {
+                      ...b.intake,
+                      follow_up: null,
+                    },
+                  }
+                : {}),
+            };
+          });
+        };
+
+        const updatedBookings = updateBookingList(previousData.data.bookings);
+
+        const summary = { ...previousData.data.summary };
+        if (isIntakeAction) {
+          summary.intake_followed_up = Math.max(0, (summary.intake_followed_up || 1) - 1);
+          summary.intake_form_missing = (summary.intake_form_missing || 0) + 1;
+        }
+        if (undoneAction && summary.actions_taken && (summary.actions_taken as any)[undoneAction]) {
+          summary.actions_taken = {
+            ...summary.actions_taken,
+            [undoneAction]: Math.max(0, ((summary.actions_taken as any)[undoneAction] || 1) - 1),
+          };
+        }
 
         queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
           ...previousData,
           data: {
             ...previousData.data,
             bookings: updatedBookings,
+            summary,
           },
         });
+
+        queryClient.setQueriesData<ClientActionsResponse>(
+          { queryKey: ["frontdesk-client-actions", selectedDate] },
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                bookings: updateBookingList(old.data.bookings),
+                summary,
+              },
+            };
+          }
+        );
       }
 
       return { previousData, actionsQueryKey };
@@ -1121,10 +1345,12 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
                     onUndoAction={handleUndoAction}
                     isLoggingAction={logActionMutation.isPending}
                     undoingEntryId={undoingEntryId}
-                    isToggling={
-                      togglingRowKey ===
-                      (booking.clubready_user_id || booking.booking_id)
-                    }
+                    isToggling={Boolean(
+                      togglingRowKey &&
+                        (togglingRowKey === booking.clubready_user_id ||
+                          togglingRowKey === booking.booking_id ||
+                          togglingRowKey === actionRowKey(booking, idx))
+                    )}
                     copiedId={copiedId}
                     onCopyId={handleCopyId}
                     formatUtcDateTime={formatUtcDateTime}
@@ -1201,9 +1427,10 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         }}
         isTogglingFollowUp={Boolean(
           noteModalVisit &&
-          togglingRowKey ===
-          (noteModalVisit.row.booking_id ??
-            `fv:${noteModalVisit.row.clubready_user_id}:${noteModalVisit.row.intake?.location_id ?? ""}`)
+            togglingRowKey &&
+            (togglingRowKey === noteModalVisit.row.clubready_user_id ||
+              togglingRowKey === noteModalVisit.row.booking_id ||
+              togglingRowKey === actionRowKey(noteModalVisit.row, 0))
         )}
         noteText={noteModalVisit?.noteText || ""}
         onChangeNote={(txt) =>

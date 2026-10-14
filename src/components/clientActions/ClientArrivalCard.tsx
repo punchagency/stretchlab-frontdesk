@@ -19,8 +19,10 @@ import {
   ClientActionRow,
   ActionEntry,
   getDeskStaff,
+  isRowCompleted,
+  getRowPendingActionsCount,
 } from "../../service/clientActions";
-import { ActionBadgeChip } from "./ActionBadgeChip";
+import { ActionBadgeChip, MustGetChip } from "./ActionBadgeChip";
 import {
   Tooltip,
   TooltipContent,
@@ -108,7 +110,9 @@ const ActionsTakenList: React.FC<{
       </span>
       {actions.map((entry) => {
         const isUndoable =
-          entry.action === "maps" || entry.action === "book_next";
+          entry.action === "maps" ||
+          entry.action === "book_next" ||
+          entry.action === "intake_form";
         const timeStr = entry.done_at ? formatUtcTime(entry.done_at) : "";
         const matchedStaff = entry.staff_id
           ? staffList.find((s) => s.id === entry.staff_id)
@@ -246,9 +250,15 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
 }) => {
   const isStale = Boolean(row.stale);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
-  const hasActions = row.badges.length > 0;
-  const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
-  const isCompleted = row.badges.length === 0;
+  const isCompleted = isRowCompleted(row);
+  const pendingActionsCount = getRowPendingActionsCount(row);
+  const hasActions = pendingActionsCount > 0;
+  const hasGoalBadge =
+    row.badges.some((b) => b.startsWith("goal_")) ||
+    (row.must_get?.some((m) => m.action === "goal" && !m.done) ?? false);
+  const pendingMustGet = row.must_get
+    ? row.must_get.filter((item) => !item.done)
+    : [];
 
   // Collapsed accordion strip (compact view when tasks are completed or slot is in the past)
   if (isCollapsed) {
@@ -313,7 +323,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-              <span>{row.badges.length} pending</span>
+              <span>{pendingActionsCount} pending</span>
             </span>
           )}
 
@@ -467,10 +477,39 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
 
         {/* Right Section: Badges & Fast Action Buttons */}
         <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap pt-2 lg:pt-0 border-t lg:border-t-0 border-neutral-tertiary/60">
-          {/* Action Badges */}
+          {/* Action Badges / Must Get Line */}
           <div className="flex flex-wrap items-center gap-1">
-            {row.badges.length === 0 ? (
+            {row.must_get ? (
+              pendingMustGet.length === 0 ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>✓ No Action Needed</span>
+                </span>
+              ) : (
+                <>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+                    Must Get:
+                  </span>
+                  {pendingMustGet.map((item) => (
+                    <MustGetChip
+                      key={item.action}
+                      item={item}
+                      row={row}
+                      onGoalClick={onGoalClick}
+                      onToggleFollowUp={onToggleFollowUp}
+                      onLogMaps={onLogMaps}
+                      onLogBookNext={onLogBookNext}
+                      onUndoAction={onUndoAction}
+                      isToggling={isToggling}
+                      isLoggingAction={isLoggingAction}
+                      undoingEntryId={undoingEntryId}
+                    />
+                  ))}
+                </>
+              )
+            ) : row.badges.length === 0 ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
                 <span>✓ No Action Needed</span>
               </span>
             ) : (
@@ -638,15 +677,25 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
 }) => {
   const isStale = Boolean(row.stale);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
-  const hasActions = row.badges.length > 0;
-  const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
+  const isCompleted = isRowCompleted(row);
+  const pendingActionsCount = getRowPendingActionsCount(row);
+  const hasActions = pendingActionsCount > 0;
+  const hasGoalBadge =
+    row.badges.some((b) => b.startsWith("goal_")) ||
+    (row.must_get?.some((m) => m.action === "goal" && !m.done) ?? false);
+  const gridPendingMustGet = row.must_get
+    ? row.must_get.filter((item) => !item.done)
+    : [];
 
   return (
     <div
-      className={`group relative bg-white rounded-3xl p-5 border transition-all duration-200 hover:shadow-lg flex flex-col justify-between space-y-4 ${hasActions
-        ? "border-neutral-tertiary hover:border-primary-base/50"
-        : "border-neutral-tertiary/70 bg-neutral-quaternary/10 hover:border-neutral-tertiary"
-        }`}
+      className={`group relative bg-white rounded-3xl p-5 border transition-all duration-200 hover:shadow-lg flex flex-col justify-between space-y-4 ${
+        isCompleted
+          ? "border-emerald-200/90 bg-emerald-50/15 hover:border-emerald-300"
+          : hasActions
+            ? "border-neutral-tertiary hover:border-primary-base/50"
+            : "border-neutral-tertiary/70 bg-neutral-quaternary/10 hover:border-neutral-tertiary"
+      }`}
     >
       {/* Top Header: Time Pill & Status Badges */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -801,11 +850,40 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
         </div>
       )}
 
-      {/* Critical Action Badges */}
+      {/* Critical Action Badges / Must Get */}
       <div className="pt-2 border-t border-neutral-tertiary/60 min-h-[44px] flex items-center">
         <div className="flex flex-wrap items-center gap-1.5 w-full">
-          {row.badges.length === 0 ? (
+          {row.must_get ? (
+            gridPendingMustGet.length === 0 ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>✓ No Action Needed</span>
+              </span>
+            ) : (
+              <>
+                <span className="text-[11px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+                  Must Get:
+                </span>
+                {gridPendingMustGet.map((item) => (
+                  <MustGetChip
+                    key={item.action}
+                    item={item}
+                    row={row}
+                    onGoalClick={onGoalClick}
+                    onToggleFollowUp={onToggleFollowUp}
+                    onLogMaps={onLogMaps}
+                    onLogBookNext={onLogBookNext}
+                    onUndoAction={onUndoAction}
+                    isToggling={isToggling}
+                    isLoggingAction={isLoggingAction}
+                    undoingEntryId={undoingEntryId}
+                  />
+                ))}
+              </>
+            )
+          ) : row.badges.length === 0 ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
               <span>✓ No Action Needed</span>
             </span>
           ) : (
