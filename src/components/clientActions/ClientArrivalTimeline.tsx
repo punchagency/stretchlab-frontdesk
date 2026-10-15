@@ -3,11 +3,19 @@ import {
   Clock,
   CheckCircle2,
   ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Minimize2,
+  Maximize2,
+  Check,
 } from "lucide-react";
 import {
   ClientActionRow,
   ActionEntry,
   actionRowKey,
+  isRowCompleted,
+  getRowPendingActionsCount,
 } from "../../service/clientActions";
 import { ClientArrivalCard } from "./ClientArrivalCard";
 import { ClientActionsPagination } from "./ClientActionsPagination";
@@ -24,6 +32,7 @@ interface ClientArrivalTimelineProps {
   onUndoAction?: (entry: ActionEntry) => void;
   isLoggingAction?: boolean;
   undoingEntryId?: number | null;
+  isFetchingActions?: boolean;
   togglingRowKey: string | null;
   copiedId: string | null;
   onCopyId: (id: string, e: React.MouseEvent) => void;
@@ -37,6 +46,8 @@ interface TimeSlotGroup {
   minutes: number;
   bookings: ClientActionRow[];
   isNextUp: boolean;
+  isPast: boolean;
+  isAllComplete: boolean;
   actionCount: number;
   firstVisitCount: number;
 }
@@ -77,6 +88,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   onUndoAction,
   isLoggingAction,
   undoingEntryId,
+  isFetchingActions,
   togglingRowKey,
   copiedId,
   onCopyId,
@@ -84,18 +96,52 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   onClearFilters,
 }) => {
   const nextUpRef = useRef<HTMLDivElement | null>(null);
+  const quickNavRef = useRef<HTMLDivElement | null>(null);
 
   // Slot pagination state: default 5 time slots per page
   const [slotPage, setSlotPage] = useState(1);
   const [slotPageSize, setSlotPageSize] = useState(5);
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const hasAutoScrolledRef = useRef(false);
 
-  // Reset pagination and auto-scroll flag when date changes
+  // Check whether quick navigation bar can scroll left or right
+  const checkScrollability = () => {
+    const el = quickNavRef.current;
+    if (el) {
+      const hasOverflow = el.scrollWidth > el.clientWidth + 2;
+      setCanScrollLeft(el.scrollLeft > 4);
+      setCanScrollRight(
+        hasOverflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 4
+      );
+    }
+  };
+
+  const scrollQuickNav = (direction: "left" | "right") => {
+    if (quickNavRef.current) {
+      const scrollAmount = direction === "left" ? -220 : 220;
+      quickNavRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+      setTimeout(checkScrollability, 300);
+    }
+  };
+
+  // Focus Mode: Defaults to true. Automatically collapses past slots and completed clients/slots
+  const [focusMode, setFocusMode] = useState<boolean>(true);
+
+  // Manual user overrides for slot expand/collapse: Record<slotKey, boolean>
+  const [slotOverrides, setSlotOverrides] = useState<Record<string, boolean>>({});
+
+  // Manual user overrides for card expand/collapse: Record<cardKey, boolean>
+  const [cardOverrides, setCardOverrides] = useState<Record<string, boolean>>({});
+
+  // Reset pagination, overrides and auto-scroll flag when date changes
   useEffect(() => {
     setSlotPage(1);
     setActiveSlotKey(null);
     hasAutoScrolledRef.current = false;
+    setSlotOverrides({});
+    setCardOverrides({});
   }, [selectedDate]);
 
   // Group and sort bookings into chronological time slots
@@ -119,7 +165,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
         const minutes =
           timeKey === "Unscheduled" ? 99999 : parseTimeToMinutes(timeKey);
         const actionCount = slotBookings.reduce(
-          (acc, b) => acc + b.badges.length,
+          (acc, b) => acc + getRowPendingActionsCount(b),
           0
         );
         const firstVisitCount = slotBookings.filter(
@@ -128,12 +174,18 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
 
         const displayTime = timeKey === "Unscheduled" ? "Open Schedule" : timeKey;
 
+        const isPast =
+          isToday && minutes !== 99999 && minutes < currentMinutes;
+        const isAllComplete = slotBookings.every(isRowCompleted);
+
         return {
           timeKey,
           displayTime,
           minutes,
           bookings: slotBookings,
           isNextUp: false,
+          isPast,
+          isAllComplete,
           actionCount,
           firstVisitCount,
         };
@@ -148,9 +200,9 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     if (isToday && parsedSlots.length > 0) {
       const scheduledSlots = parsedSlots.filter((s) => s.minutes !== 99999);
       if (scheduledSlots.length > 0) {
-        // Select slot currently in progress (within 30 mins after start) or earliest upcoming slot
+        // Select earliest upcoming arrival slot for today
         const nextSlot = scheduledSlots.find(
-          (s) => s.minutes >= currentMinutes - 30
+          (s) => s.minutes >= currentMinutes
         );
         if (nextSlot) {
           foundNextUpKey = nextSlot.timeKey;
@@ -165,7 +217,10 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
       }
     }
 
-    const totalActions = bookings.reduce((acc, b) => acc + b.badges.length, 0);
+    const totalActions = bookings.reduce(
+      (acc, b) => acc + getRowPendingActionsCount(b),
+      0
+    );
 
     return {
       slots: parsedSlots,
@@ -174,9 +229,73 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     };
   }, [bookings, selectedDate, todayStr]);
 
+  // Check scrollability on slots change or window resize
+  useEffect(() => {
+    checkScrollability();
+    const handleResize = () => checkScrollability();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [slots]);
+
+  // Collapse evaluation helpers
+  const isSlotCollapsed = (slot: TimeSlotGroup): boolean => {
+    if (slotOverrides[slot.timeKey] !== undefined) {
+      return slotOverrides[slot.timeKey];
+    }
+    if (!focusMode) return false;
+    return slot.isPast || slot.isAllComplete;
+  };
+
+  const toggleSlotCollapse = (timeKey: string) => {
+    const slot = slots.find((s) => s.timeKey === timeKey);
+    if (!slot) return;
+    const current = isSlotCollapsed(slot);
+    setSlotOverrides((prev) => ({
+      ...prev,
+      [timeKey]: !current,
+    }));
+  };
+
+  const isCardCollapsed = (
+    booking: ClientActionRow,
+    slot: TimeSlotGroup,
+    cardKey: string
+  ): boolean => {
+    if (cardOverrides[cardKey] !== undefined) {
+      return cardOverrides[cardKey];
+    }
+    if (!focusMode) return false;
+    const isClientComplete = isRowCompleted(booking);
+    return slot.isPast || isClientComplete;
+  };
+
+  const toggleCardCollapse = (
+    cardKey: string,
+    booking: ClientActionRow,
+    slot: TimeSlotGroup
+  ) => {
+    const current = isCardCollapsed(booking, slot, cardKey);
+    setCardOverrides((prev) => ({
+      ...prev,
+      [cardKey]: !current,
+    }));
+  };
+
+  const toggleFocusMode = () => {
+    const next = !focusMode;
+    setFocusMode(next);
+    setSlotOverrides({});
+    setCardOverrides({});
+  };
+
   // Navigate & scroll to any specified slot
   const scrollToSlot = (timeKey: string) => {
     setActiveSlotKey(timeKey);
+    // Expand slot when navigated to
+    setSlotOverrides((prev) => ({
+      ...prev,
+      [timeKey]: false,
+    }));
     const slotIdx = slots.findIndex((s) => s.timeKey === timeKey);
     if (slotIdx >= 0 && slotPageSize > 0) {
       const targetPage = Math.floor(slotIdx / slotPageSize) + 1;
@@ -185,6 +304,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
       }
     }
 
+    // Scroll timeline slot into view
     const safeId = `timeline-slot-${timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
     const executeScroll = () => {
       const el =
@@ -200,6 +320,17 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
     if (!executeScroll()) {
       setTimeout(executeScroll, 120);
       setTimeout(executeScroll, 300);
+    }
+
+    // Also center the pill in the quick nav bar
+    const pillId = `quick-nav-pill-${timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const pillEl = document.getElementById(pillId);
+    if (pillEl) {
+      pillEl.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
     }
   };
 
@@ -235,6 +366,17 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
           hasAutoScrolledRef.current = true;
           setActiveSlotKey(nextUpSlotKey);
         }
+
+        const pillId = `quick-nav-pill-${nextUpSlotKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        const pillEl = document.getElementById(pillId);
+        if (pillEl) {
+          pillEl.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        }
+        checkScrollability();
       }, 180);
 
       return () => clearTimeout(timer);
@@ -318,16 +460,45 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
             </div>
           </div>
 
-          {nextUpSlotKey && selectedDate === todayStr && (
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {/* View Mode Toggle: Focus (Auto-collapse) vs All Expanded */}
             <button
               type="button"
-              onClick={handleScrollToNextUp}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-primary-base text-white hover:bg-primary-base/90 shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+              onClick={toggleFocusMode}
+              className={`px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 border shadow-2xs ${focusMode
+                ? "bg-primary-base/10 text-primary-base border-primary-base/30 hover:bg-primary-base/20 font-black"
+                : "bg-white text-dark-1 border-neutral-tertiary hover:bg-neutral-quaternary font-bold"
+                }`}
+              title={
+                focusMode
+                  ? "Focus Mode: Completed and past time slots are automatically collapsed. Click to expand all."
+                  : "All Expanded: All slots and cards are shown open. Click to enable Focus Mode."
+              }
             >
-              <ArrowDown className="w-3.5 h-3.5" />
-              <span>Jump to Current ({nextUpSlotKey})</span>
+              {focusMode ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Focus: Due Only</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>All Expanded</span>
+                </>
+              )}
             </button>
-          )}
+
+            {nextUpSlotKey && selectedDate === todayStr && (
+              <button
+                type="button"
+                onClick={handleScrollToNextUp}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-primary-base text-white hover:bg-primary-base/90 shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+                <span>Jump to Current ({nextUpSlotKey})</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Quick Navigation Bar: Horizontal scrollable time slot pills */}
@@ -342,56 +513,92 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                 Click any slot to jump directly
               </span>
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-              {slots.map((slot) => {
-                const isCurrent = slot.isNextUp && selectedDate === todayStr;
-                const isSelected = activeSlotKey === slot.timeKey;
 
-                return (
-                  <button
-                    key={slot.timeKey}
-                    type="button"
-                    onClick={() => scrollToSlot(slot.timeKey)}
-                    className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isSelected
+            {/* Scrollable slots track flanked by Left and Right navigation chevrons */}
+            <div className="relative flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => scrollQuickNav("left")}
+                disabled={!canScrollLeft}
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${canScrollLeft
+                  ? "bg-neutral-quaternary hover:bg-neutral-tertiary text-dark-1 border border-neutral-tertiary shadow-2xs cursor-pointer active:scale-95"
+                  : "bg-neutral-quaternary/40 text-grey-3 border border-neutral-tertiary/30 cursor-not-allowed opacity-40"
+                  }`}
+                title="Scroll slots left"
+                aria-label="Scroll slots left"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div
+                ref={quickNavRef}
+                onScroll={checkScrollability}
+                className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-thin scroll-smooth flex-1 min-w-0"
+              >
+                {slots.map((slot) => {
+                  const isCurrent = slot.isNextUp && selectedDate === todayStr;
+                  const isSelected = activeSlotKey === slot.timeKey;
+
+                  return (
+                    <button
+                      key={slot.timeKey}
+                      id={`quick-nav-pill-${slot.timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`}
+                      type="button"
+                      onClick={() => scrollToSlot(slot.timeKey)}
+                      className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
                         ? "bg-primary-base text-white shadow-2xs ring-2 ring-primary-base/30"
                         : isCurrent
-                        ? "bg-primary-base/15 text-primary-base border border-primary-base/30 font-black hover:bg-primary-base/20"
-                        : "bg-neutral-quaternary text-dark-1 hover:bg-neutral-tertiary/70 border border-neutral-tertiary"
-                    }`}
-                  >
-                    <span>{slot.displayTime}</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                        isSelected
+                          ? "bg-primary-base/15 text-primary-base border border-primary-base/30 font-black hover:bg-primary-base/20"
+                          : "bg-neutral-quaternary text-dark-1 hover:bg-neutral-tertiary/70 border border-neutral-tertiary"
+                        }`}
+                    >
+                      <span>{slot.displayTime}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${isSelected
                           ? "bg-white/20 text-white"
                           : isCurrent
-                          ? "bg-primary-base text-white"
-                          : "bg-white text-grey-5 border border-neutral-tertiary"
-                      }`}
-                    >
-                      {slot.bookings.length}
-                    </span>
-                    {slot.actionCount > 0 && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isSelected
+                            ? "bg-primary-base text-white"
+                            : slot.isAllComplete
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                              : "bg-white text-grey-5 border border-neutral-tertiary"
+                          }`}
+                      >
+                        {slot.bookings.length}
+                      </span>
+                      {slot.actionCount > 0 && (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${isSelected
                             ? "bg-amber-300"
                             : isCurrent
-                            ? "bg-rose-500"
-                            : "bg-rose-500"
-                        }`}
-                        title={`${slot.actionCount} action(s) required`}
-                      />
-                    )}
-                    {isCurrent && !isSelected && (
-                      <span className="text-[9px] font-black uppercase text-primary-base bg-primary-base/10 px-1 py-0.2 rounded">
-                        Now
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                              ? "bg-rose-500"
+                              : "bg-rose-500"
+                            }`}
+                          title={`${slot.actionCount} action(s) required`}
+                        />
+                      )}
+                      {isCurrent && !isSelected && (
+                        <span className="text-[9px] font-black uppercase text-primary-base bg-primary-base/10 px-1 py-0.2 rounded">
+                          Now
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => scrollQuickNav("right")}
+                disabled={!canScrollRight}
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${canScrollRight
+                  ? "bg-neutral-quaternary hover:bg-neutral-tertiary text-dark-1 border border-neutral-tertiary shadow-2xs cursor-pointer active:scale-95"
+                  : "bg-neutral-quaternary/40 text-grey-3 border border-neutral-tertiary/30 cursor-not-allowed opacity-40"
+                  }`}
+                title="Scroll slots right"
+                aria-label="Scroll slots right"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -402,32 +609,47 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
         {visibleSlots.map((slot) => {
           const isSlotNextUp = slot.isNextUp;
           const isSlotActive = activeSlotKey === slot.timeKey;
+          const isCollapsed = isSlotCollapsed(slot);
 
           return (
             <div
               key={slot.timeKey}
               id={`timeline-slot-${slot.timeKey.replace(/[^a-zA-Z0-9]/g, "_")}`}
               ref={isSlotNextUp ? nextUpRef : null}
-              className={`relative space-y-3 transition-all duration-300 scroll-mt-6 ${
-                isSlotActive ? "ring-2 ring-primary-base/20 rounded-2xl p-2 -m-2 bg-primary-base/[0.02]" : ""
-              }`}
+              className={`relative space-y-3 transition-all duration-300 scroll-mt-6 ${isSlotActive ? "ring-2 ring-primary-base/20 rounded-2xl p-2 -m-2 bg-primary-base/[0.02]" : ""
+                }`}
             >
               {/* Timeline Slot Header Node */}
-              <div className="flex items-center gap-3">
+              <div
+                onClick={() => toggleSlotCollapse(slot.timeKey)}
+                className="flex items-center gap-3 cursor-pointer group select-none"
+                title={isCollapsed ? "Click to expand time slot" : "Click to collapse time slot"}
+              >
                 {/* Timeline Node Dot / Icon */}
                 <div
                   className={`relative z-10 w-8 h-8 -ml-4 sm:-ml-8 rounded-full flex items-center justify-center transition-all ${isSlotNextUp
-                      ? "bg-primary-base text-white ring-4 ring-primary-base/20 shadow-md"
-                      : "bg-white text-grey-2 border-2 border-neutral-tertiary"
+                    ? "bg-primary-base text-white ring-4 ring-primary-base/20 shadow-md"
+                    : slot.isAllComplete
+                      ? "bg-emerald-500 text-white border-2 border-emerald-600 shadow-2xs"
+                      : "bg-white text-grey-2 border-2 border-neutral-tertiary group-hover:border-primary-base/50"
                     }`}
                 >
-                  <Clock className="w-3.5 h-3.5" />
+                  {slot.isAllComplete ? (
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  ) : (
+                    <Clock className="w-3.5 h-3.5" />
+                  )}
                 </div>
 
                 {/* Time slot banner badge */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-3 py-1 rounded-xl text-xs font-black tracking-tight bg-neutral-quaternary text-dark-1 border border-neutral-tertiary shadow-2xs">
-                    {slot.displayTime}
+                  <span className="px-3 py-1 rounded-xl text-xs font-black tracking-tight bg-neutral-quaternary text-dark-1 border border-neutral-tertiary shadow-2xs group-hover:border-primary-base/40 flex items-center gap-1.5 transition-colors">
+                    <span>{slot.displayTime}</span>
+                    {isCollapsed ? (
+                      <ChevronRight className="w-3.5 h-3.5 text-grey-4 group-hover:text-dark-1" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-grey-4 group-hover:text-dark-1" />
+                    )}
                   </span>
 
                   {isSlotNextUp && (
@@ -455,42 +677,81 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                       {slot.actionCount === 1 ? "" : "s"} Required
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>No Actions Needed</span>
+                      <span>All Tasks Complete</span>
+                    </span>
+                  )}
+
+                  {slot.isPast && (
+                    <span className="text-[10px] font-bold text-grey-4 uppercase tracking-wider">
+                      (Past)
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Slot Client Cards Stack */}
-              <div className="space-y-2.5 pt-1">
-                {slot.bookings.map((booking, idx) => {
-                  const key = actionRowKey(booking, idx);
-                  const isToggling =
-                    togglingRowKey ===
-                    (booking.clubready_user_id || booking.booking_id);
+              {/* Slot Content: Collapsed Summary Strip OR Client Cards Stack */}
+              {isCollapsed ? (
+                <div
+                  onClick={() => toggleSlotCollapse(slot.timeKey)}
+                  className="ml-4 sm:ml-8 mt-1 px-3.5 py-2.5 bg-neutral-quaternary/40 hover:bg-neutral-quaternary/80 rounded-xl border border-gray-300 flex items-center justify-between gap-3 text-xs cursor-pointer transition-colors shadow-2xs group"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="font-bold text-dark-1 shrink-0 text-xs">
+                      {slot.bookings.length} {slot.bookings.length === 1 ? "client" : "clients"}:
+                    </span>
+                    <span className="text-grey-5 truncate text-[11px]">
+                      {slot.bookings
+                        .map((b) => b.client_name)
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-bold text-primary-base flex items-center gap-0.5 group-hover:underline">
+                      <span>Expand Slot</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Slot Client Cards Stack */
+                <div className="space-y-2.5 pt-1">
+                  {slot.bookings.map((booking, idx) => {
+                    const key = actionRowKey(booking, idx);
+                    const cardCollapsed = isCardCollapsed(booking, slot, key);
+                    const isToggling = Boolean(
+                      togglingRowKey &&
+                        (togglingRowKey === booking.clubready_user_id ||
+                          togglingRowKey === booking.booking_id ||
+                          togglingRowKey === actionRowKey(booking, idx))
+                    );
 
-                  return (
-                    <ClientArrivalCard
-                      key={key}
-                      row={booking}
-                      onGoalClick={onGoalClick}
-                      onToggleFollowUp={onToggleFollowUp}
-                      onOpenNoteDrawer={onOpenNoteDrawer}
-                      onLogMaps={onLogMaps}
-                      onLogBookNext={onLogBookNext}
-                      onUndoAction={onUndoAction}
-                      isLoggingAction={isLoggingAction}
-                      undoingEntryId={undoingEntryId}
-                      isToggling={isToggling}
-                      copiedId={copiedId}
-                      onCopyId={onCopyId}
-                      formatUtcDateTime={formatUtcDateTime}
-                    />
-                  );
-                })}
-              </div>
+                    return (
+                      <ClientArrivalCard
+                        key={key}
+                        row={booking}
+                        isCollapsed={cardCollapsed}
+                        onToggleCollapse={() => toggleCardCollapse(key, booking, slot)}
+                        onGoalClick={onGoalClick}
+                        onToggleFollowUp={onToggleFollowUp}
+                        onOpenNoteDrawer={onOpenNoteDrawer}
+                        onLogMaps={onLogMaps}
+                        onLogBookNext={onLogBookNext}
+                        onUndoAction={onUndoAction}
+                        isLoggingAction={isLoggingAction}
+                        undoingEntryId={undoingEntryId}
+                        isFetchingActions={isFetchingActions}
+                        isToggling={isToggling}
+                        copiedId={copiedId}
+                        onCopyId={onCopyId}
+                        formatUtcDateTime={formatUtcDateTime}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}

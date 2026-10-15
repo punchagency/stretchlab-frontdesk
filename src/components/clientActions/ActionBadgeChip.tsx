@@ -9,7 +9,13 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
-import { ActionBadge, ClientActionRow, localDay } from "../../service/clientActions";
+import {
+  ActionBadge,
+  ClientActionRow,
+  localDay,
+  MustGetItem,
+  ActionEntry,
+} from "../../service/clientActions";
 import {
   Tooltip,
   TooltipContent,
@@ -46,7 +52,8 @@ export const ActionBadgeChip: React.FC<ActionBadgeChipProps> = ({
 
   switch (badgeKey) {
     case "intake_form_missing": {
-      const isReminded = Boolean(row.intake?.follow_up?.checked);
+      const mustGetItem = row.must_get?.find((m) => m.action === "intake_form");
+      const isReminded = mustGetItem ? Boolean(mustGetItem.done) : Boolean(row.intake?.follow_up?.checked);
       const actionInstruction = isToday
         ? "Resend text from SMS platform to have client fill out intake form upon arrival so we can provide the best service"
         : "Send text from SMS platform to remind client to fill out form prior to arrival so we can provide the best service";
@@ -455,4 +462,107 @@ export const ActionBadgeList: React.FC<ActionBadgeListProps> = ({
       ))}
     </div>
   );
+};
+
+export interface MustGetChipProps {
+  item: MustGetItem;
+  row: ClientActionRow;
+  todayStr?: string;
+  onGoalClick: (row: ClientActionRow) => void;
+  onToggleFollowUp: (row: ClientActionRow) => void;
+  onLogMaps?: (row: ClientActionRow) => void;
+  onLogBookNext?: (row: ClientActionRow, count?: number) => void;
+  onUndoAction?: (entry: ActionEntry) => void;
+  isToggling?: boolean;
+  isLoggingAction?: boolean;
+  undoingEntryId?: number | null;
+}
+
+export const MustGetChip: React.FC<MustGetChipProps> = ({
+  item,
+  row,
+  todayStr,
+  onGoalClick,
+  onToggleFollowUp,
+  onLogMaps,
+  onLogBookNext,
+  isToggling,
+  isLoggingAction,
+}) => {
+  // If the action is already logged, it appears in the "LOGGED:" section below,
+  // so it is removed from "MUST GET:". If undone, item.done becomes false and it returns here.
+  if (item.done) {
+    return null;
+  }
+
+  // Open item (done is false or null) -> Render actionable button
+  if (item.action === "intake_form") {
+    return (
+      <ActionBadgeChip
+        badgeKey="intake_form_missing"
+        row={row}
+        todayStr={todayStr}
+        onGoalClick={onGoalClick}
+        onToggleFollowUp={onToggleFollowUp}
+        onLogMaps={onLogMaps}
+        onLogBookNext={onLogBookNext}
+        isToggling={isToggling}
+        isLoggingAction={isLoggingAction}
+      />
+    );
+  }
+
+  if (item.action === "maps") {
+    return (
+      <ActionBadgeChip
+        badgeKey="maps_due"
+        row={row}
+        todayStr={todayStr}
+        onGoalClick={onGoalClick}
+        onToggleFollowUp={onToggleFollowUp}
+        onLogMaps={onLogMaps}
+        onLogBookNext={onLogBookNext}
+        isToggling={isToggling}
+        isLoggingAction={isLoggingAction}
+      />
+    );
+  }
+
+  if (item.action === "book_next") {
+    return (
+      <ActionBadgeChip
+        badgeKey="future_bookings_below_target"
+        row={row}
+        todayStr={todayStr}
+        onGoalClick={onGoalClick}
+        onToggleFollowUp={onToggleFollowUp}
+        onLogMaps={onLogMaps}
+        onLogBookNext={onLogBookNext}
+        isToggling={isToggling}
+        isLoggingAction={isLoggingAction}
+      />
+    );
+  }
+
+  if (item.action === "goal") {
+    const goalBadge =
+      item.badges.find(
+        (b) => b === "goal_template" || b === "goal_update_due"
+      ) || "goal_missing";
+    return (
+      <ActionBadgeChip
+        badgeKey={goalBadge}
+        row={row}
+        todayStr={todayStr}
+        onGoalClick={onGoalClick}
+        onToggleFollowUp={onToggleFollowUp}
+        onLogMaps={onLogMaps}
+        onLogBookNext={onLogBookNext}
+        isToggling={isToggling}
+        isLoggingAction={isLoggingAction}
+      />
+    );
+  }
+
+  return null;
 };

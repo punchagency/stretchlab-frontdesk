@@ -16,7 +16,6 @@ import {
   Loader2,
   LayoutGrid,
   CheckCircle2,
-  UserCheck,
 } from "lucide-react";
 import {
   getClientActions,
@@ -31,7 +30,10 @@ import {
   logClientAction,
   undoClientAction,
   ActionEntry,
+  DeskStaffMember,
+  isRowCompleted,
 } from "../../service/clientActions";
+import { getUserInfo } from "../../utils/user";
 import {
   checkFollowUp,
   uncheckFollowUp,
@@ -84,8 +86,6 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const [badgeFilter, setBadgeFilter] = useState<BadgeFilterType>("all");
   const [viewMode, setViewMode] = useState<"timeline" | "cards">("timeline");
 
-  // Staff on Desk State
-  const [activeStaffId, setActiveStaffId] = useState<number | null>(null);
   const [undoingEntryId, setUndoingEntryId] = useState<number | null>(null);
 
   // Modals state
@@ -123,21 +123,41 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const deskStaffList = deskStaffResponse?.data?.staff || [];
   const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
 
-  // Preselect default staff on desk if available and activeStaffId hasn't been set
-  useEffect(() => {
-    if (
-      activeStaffId === null &&
-      defaultStaffId !== undefined &&
-      defaultStaffId !== null
-    ) {
-      setActiveStaffId(defaultStaffId);
+  // Resolve logged-in staff member from staff list:
+  // 1. If default_staff_id is provided by API, match by id.
+  // 2. If default_staff_id is null/not found, match by logged-in user's email against staff.email or staff.name
+  const currentStaff = useMemo<DeskStaffMember | null>(() => {
+    const userInfo = getUserInfo();
+    const loggedInEmail = userInfo?.email?.toLowerCase().trim() || "";
+    const loggedInUsername = userInfo?.username?.toLowerCase().trim() || "";
+
+    if (defaultStaffId !== null && defaultStaffId !== undefined) {
+      const found = deskStaffList.find((s) => s.id === defaultStaffId);
+      if (found) return found;
     }
-  }, [defaultStaffId, activeStaffId]);
+
+    if (loggedInEmail || loggedInUsername) {
+      const found = deskStaffList.find((s) => {
+        const sEmail = s.email?.toLowerCase().trim();
+        const sName = s.name?.toLowerCase().trim();
+        return (
+          (loggedInEmail && (sEmail === loggedInEmail || sName === loggedInEmail)) ||
+          (loggedInUsername && (sEmail === loggedInUsername || sName === loggedInUsername))
+        );
+      });
+      if (found) return found;
+    }
+
+    return null;
+  }, [deskStaffList, defaultStaffId]);
+
+  const activeStaffId = currentStaff?.id ?? defaultStaffId ?? null;
 
   // Main Data Query
   const {
     data: clientActionsResponse,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -149,6 +169,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     ],
     queryFn: () =>
       getClientActions(selectedDate, selectedLocation || undefined),
+
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: (failureCount, err: any) => {
@@ -201,7 +222,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           (b) => b.goal?.on_file === true || Boolean(b.goal?.goal)
         );
       } else if (badgeFilter === "no_actions") {
-        result = result.filter((b) => b.badges.length === 0);
+        result = result.filter(isRowCompleted);
       } else {
         result = result.filter((b) =>
           b.badges.includes(badgeFilter as ActionBadge)
@@ -231,7 +252,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   }, [bookings, badgeFilter, search]);
 
   const allClearCount = useMemo(
-    () => bookings.filter((b) => b.badges.length === 0).length,
+    () => bookings.filter(isRowCompleted).length,
     [bookings]
   );
 
@@ -311,58 +332,169 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       const previousData =
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
-      if (previousData) {
-        const staffMemberName =
-          deskStaffList.find((s) => s.id === activeStaffId)?.name || "You";
+      const staffMember =
+        deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
+      const userInfo = getUserInfo();
+      const staffMemberName =
+        staffMember?.name ||
+        staffMember?.email ||
+        userInfo?.name ||
+        userInfo?.email ||
+        "Front Desk";
 
-        const updatedBookings = previousData.data.bookings.map((b) => {
-          if (
-            b.clubready_user_id === row.clubready_user_id &&
-            b.intake?.location_id === row.intake?.location_id
-          ) {
-            const newFollowUp: FollowUp | null = uncheck
-              ? null
-              : {
-                checked: true,
-                checked_at: new Date().toISOString(),
-                checked_by: null,
-                checked_by_name: staffMemberName,
-                note:
-                  note !== undefined
-                    ? note
-                    : b.intake?.follow_up?.note || null,
-              };
-            return {
-              ...b,
-              intake: b.intake ? { ...b.intake, follow_up: newFollowUp } : null,
+      const tempIntakeEntry: ActionEntry = {
+        id: Date.now(),
+        action: "intake_form",
+        booking_date: selectedDate,
+        booking_id: row.booking_id || null,
+        location_name: row.location_name || null,
+        store_id: row.intake?.location_id || null,
+        booked_count: null,
+        client_goal_id: null,
+        note: note !== undefined ? note : row.intake?.follow_up?.note || null,
+        done_by: 0,
+        done_by_name: staffMemberName,
+        staff_id: activeStaffId || null,
+        staff_name: staffMember ? (staffMember.name || staffMember.email || null) : staffMemberName,
+        done_at: new Date().toISOString(),
+        undone_at: null,
+        undone_by: null,
+        undone_by_name: null,
+        undone_staff_id: null,
+        undone_staff_name: null,
+        check: {
+          status: "pending",
+          reason: "text_not_recorded",
+          evidence: {
+            form_received: false,
+            submitted_at: null,
+          },
+        },
+      };
+
+      const updateBookingList = (bookings: ClientActionRow[]) => {
+        return bookings.map((b) => {
+          const isSameRow =
+            (row.booking_id != null && b.booking_id != null && String(b.booking_id) === String(row.booking_id)) ||
+            (row.clubready_user_id != null && b.clubready_user_id != null && String(b.clubready_user_id) === String(row.clubready_user_id));
+
+          if (!isSameRow) return b;
+
+          const newFollowUp: FollowUp | null = uncheck
+            ? null
+            : {
+              checked: true,
+              checked_at: new Date().toISOString(),
+              checked_by: null,
+              checked_by_name: staffMemberName,
+              note:
+                note !== undefined
+                  ? note
+                  : b.intake?.follow_up?.note || null,
             };
-          }
-          return b;
-        });
 
-        const updatedFollowedUpCount = updatedBookings.filter(
-          (b) => b.intake?.follow_up?.checked
-        ).length;
+          const remainingActions = (b.actions_taken || []).filter(
+            (a) => a.action !== "intake_form"
+          );
+          const newActionsTaken = uncheck
+            ? remainingActions
+            : [tempIntakeEntry, ...remainingActions];
+
+          let hasIntakeItem = false;
+          let updatedMustGet = b.must_get ? [...b.must_get] : [];
+          updatedMustGet = updatedMustGet.map((item) => {
+            if (item.action === "intake_form") {
+              hasIntakeItem = true;
+              return {
+                ...item,
+                badges: uncheck ? ["intake_form_missing"] : [],
+                done: !uncheck,
+                can_undo: !uncheck,
+                entry: uncheck ? null : tempIntakeEntry,
+              };
+            }
+            return item;
+          });
+
+          if (!hasIntakeItem) {
+            updatedMustGet.unshift({
+              action: "intake_form",
+              badges: uncheck ? (["intake_form_missing"] as ActionBadge[]) : ([] as ActionBadge[]),
+              done: !uncheck,
+              can_undo: !uncheck,
+              entry: uncheck ? null : tempIntakeEntry,
+            });
+          }
+
+          const updatedBadges: ActionBadge[] = uncheck
+            ? (b.badges.includes("intake_form_missing")
+                ? b.badges
+                : ["intake_form_missing" as ActionBadge, ...b.badges])
+            : b.badges.filter((badge) => badge !== "intake_form_missing");
+
+          return {
+            ...b,
+            badges: updatedBadges,
+            intake: b.intake ? { ...b.intake, follow_up: newFollowUp } : null,
+            actions_taken: newActionsTaken,
+            must_get: updatedMustGet,
+          };
+        });
+      };
+
+      if (previousData) {
+        const updatedBookings = updateBookingList(previousData.data.bookings);
+
+        const summary = { ...previousData.data.summary };
+        summary.intake_followed_up = Math.max(
+          0,
+          (summary.intake_followed_up || 0) + (uncheck ? -1 : 1)
+        );
+        summary.intake_form_missing = Math.max(
+          0,
+          (summary.intake_form_missing || 0) + (uncheck ? 1 : -1)
+        );
+        if (summary.actions_taken) {
+          summary.actions_taken = {
+            ...summary.actions_taken,
+            intake_form: Math.max(
+              0,
+              (summary.actions_taken.intake_form || 0) + (uncheck ? -1 : 1)
+            ),
+          };
+        }
 
         queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
           ...previousData,
           data: {
             ...previousData.data,
             bookings: updatedBookings,
-            summary: {
-              ...previousData.data.summary,
-              intake_followed_up: updatedFollowedUpCount,
-            },
+            summary,
           },
         });
+
+        queryClient.setQueriesData<ClientActionsResponse>(
+          { queryKey: ["frontdesk-client-actions", selectedDate] },
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                bookings: updateBookingList(old.data.bookings),
+                summary,
+              },
+            };
+          }
+        );
 
         // Keep local drawer state in sync if modal is open for this row
         if (
           noteModalVisit &&
-          noteModalVisit.row.clubready_user_id === row.clubready_user_id
+          String(noteModalVisit.row.clubready_user_id) === String(row.clubready_user_id)
         ) {
           const updatedRow = updatedBookings.find(
-            (b) => b.clubready_user_id === row.clubready_user_id
+            (b) => String(b.clubready_user_id) === String(row.clubready_user_id)
           );
           if (updatedRow) {
             setNoteModalVisit((prev) =>
@@ -416,8 +548,9 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
 
   const handleToggleRowFollowUp = (row: ClientActionRow) => {
     if (!row.intake || !row.clubready_user_id) return;
-    const isChecked = Boolean(row.intake.follow_up?.checked);
-    const key = actionRowKey(row, 0);
+    const mustGetItem = row.must_get?.find((m) => m.action === "intake_form");
+    const isChecked = mustGetItem ? Boolean(mustGetItem.done) : Boolean(row.intake.follow_up?.checked);
+    const key = row.clubready_user_id || row.booking_id || actionRowKey(row, 0);
     setTogglingRowKey(key);
 
     toggleFollowUpMutation.mutate({ row, uncheck: isChecked });
@@ -453,8 +586,15 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
       if (previousData) {
-        const staffMember = deskStaffList.find((s) => s.id === activeStaffId);
-        const staffMemberName = staffMember?.name || "You";
+        const staffMember =
+          deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
+        const userInfo = getUserInfo();
+        const staffMemberName =
+          staffMember?.name ||
+          staffMember?.email ||
+          userInfo?.name ||
+          userInfo?.email ||
+          "Front Desk";
 
         const tempEntry: ActionEntry = {
           id: Date.now(),
@@ -469,7 +609,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           done_by: 0,
           done_by_name: staffMemberName,
           staff_id: activeStaffId || null,
-          staff_name: staffMemberName,
+          staff_name: staffMember ? (staffMember.name || staffMember.email || null) : staffMemberName,
           done_at: new Date().toISOString(),
           undone_at: null,
           undone_by: null,
@@ -500,24 +640,35 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             ...b,
             badges: updatedBadges,
             actions_taken: [tempEntry, ...(b.actions_taken || [])],
+            must_get: b.must_get?.map((item) => {
+              if (item.action === action) {
+                return {
+                  ...item,
+                  done: true,
+                  entry: tempEntry,
+                  can_undo: true,
+                };
+              }
+              return item;
+            }),
             ...(action === "maps"
               ? {
-                  maps: {
-                    ...b.maps,
-                    due: false,
-                    days_since_reading: 0,
-                    last_reading: "Completed today",
-                    reading_date: selectedDate,
-                  },
-                }
+                maps: {
+                  ...b.maps,
+                  due: false,
+                  days_since_reading: 0,
+                  last_reading: "Completed today",
+                  reading_date: selectedDate,
+                },
+              }
               : {}),
             ...(action === "book_next"
               ? {
-                  future_bookings: {
-                    ...b.future_bookings,
-                    count: (b.future_bookings?.count ?? 0) + (bookedCount ?? 1),
-                  },
-                }
+                future_bookings: {
+                  ...b.future_bookings,
+                  count: (b.future_bookings?.count ?? 0) + (bookedCount ?? 1),
+                },
+              }
               : {}),
           };
         });
@@ -596,18 +747,125 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
 
       if (previousData) {
-        const updatedBookings = previousData.data.bookings.map((b) => ({
-          ...b,
-          actions_taken: (b.actions_taken || []).filter((a) => a.id !== entryId),
-        }));
+        // Identify which entry and action is being undone
+        let undoneAction: string | null = null;
+        let undoneClientId: string | null = null;
+        for (const booking of previousData.data.bookings) {
+          const matchedEntry =
+            booking.actions_taken?.find((a) => String(a.id) === String(entryId)) ||
+            booking.must_get?.find((m) => m.entry && String(m.entry.id) === String(entryId))?.entry;
+          if (matchedEntry) {
+            undoneAction = matchedEntry.action;
+            undoneClientId = booking.clubready_user_id ? String(booking.clubready_user_id) : null;
+            break;
+          }
+        }
+
+        const isIntakeAction = undoneAction === "intake_form";
+
+        const updateBookingList = (bookings: ClientActionRow[]) => {
+          return bookings.map((b) => {
+            const bClientId = b.clubready_user_id ? String(b.clubready_user_id) : null;
+            const isTargetClient =
+              (undoneClientId && bClientId === undoneClientId) ||
+              b.actions_taken?.some((a) => String(a.id) === String(entryId)) ||
+              b.must_get?.some((m) => m.entry && String(m.entry.id) === String(entryId));
+
+            const remainingActions = (b.actions_taken || []).filter(
+              (a) => String(a.id) !== String(entryId) && !(isTargetClient && isIntakeAction && a.action === "intake_form")
+            );
+
+            let hasIntakeItem = false;
+            let updatedMustGet = b.must_get ? [...b.must_get] : [];
+            updatedMustGet = updatedMustGet.map((item) => {
+              if (
+                (item.entry && String(item.entry.id) === String(entryId)) ||
+                (isTargetClient && isIntakeAction && item.action === "intake_form")
+              ) {
+                hasIntakeItem = true;
+                return {
+                  ...item,
+                  badges: item.badges.includes("intake_form_missing")
+                    ? item.badges
+                    : ["intake_form_missing", ...item.badges],
+                  done: false,
+                  entry: null,
+                  can_undo: false,
+                };
+              }
+              return item;
+            });
+
+            if (isTargetClient && isIntakeAction && !hasIntakeItem) {
+              updatedMustGet.unshift({
+                action: "intake_form",
+                badges: ["intake_form_missing" as ActionBadge],
+                done: false,
+                entry: null,
+                can_undo: false,
+              });
+            }
+
+            const updatedBadges: ActionBadge[] = isTargetClient && isIntakeAction
+              ? (b.badges.includes("intake_form_missing")
+                  ? b.badges
+                  : ["intake_form_missing" as ActionBadge, ...b.badges])
+              : b.badges;
+
+            return {
+              ...b,
+              badges: updatedBadges,
+              actions_taken: remainingActions,
+              must_get: updatedMustGet,
+              ...(isTargetClient && isIntakeAction && b.intake
+                ? {
+                    intake: {
+                      ...b.intake,
+                      follow_up: null,
+                    },
+                  }
+                : {}),
+            };
+          });
+        };
+
+        const updatedBookings = updateBookingList(previousData.data.bookings);
+
+        const summary = { ...previousData.data.summary };
+        if (isIntakeAction) {
+          summary.intake_followed_up = Math.max(0, (summary.intake_followed_up || 1) - 1);
+          summary.intake_form_missing = (summary.intake_form_missing || 0) + 1;
+        }
+        if (undoneAction && summary.actions_taken && (summary.actions_taken as any)[undoneAction]) {
+          summary.actions_taken = {
+            ...summary.actions_taken,
+            [undoneAction]: Math.max(0, ((summary.actions_taken as any)[undoneAction] || 1) - 1),
+          };
+        }
 
         queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
           ...previousData,
           data: {
             ...previousData.data,
             bookings: updatedBookings,
+            summary,
           },
         });
+
+        queryClient.setQueriesData<ClientActionsResponse>(
+          { queryKey: ["frontdesk-client-actions", selectedDate] },
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                bookings: updateBookingList(old.data.bookings),
+                summary,
+              },
+            };
+          }
+        );
       }
 
       return { previousData, actionsQueryKey };
@@ -645,7 +903,14 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     });
   };
 
+  const isFetchingClientActions =
+    isFetching ||
+    toggleFollowUpMutation.isPending ||
+    logActionMutation.isPending ||
+    undoActionMutation.isPending;
+
   const handleUndoAction = (entry: ActionEntry) => {
+    if (isFetchingClientActions) return;
     undoActionMutation.mutate({ entryId: entry.id });
   };
 
@@ -682,10 +947,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-neutral-tertiary shadow-xs">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
           {/* Date Selector */}
-          <div
-            className={`${deskStaffList.length > 0 ? "md:col-span-4" : "md:col-span-5"
-              } flex flex-wrap items-center gap-2`}
-          >
+          <div className="md:col-span-5 flex flex-wrap items-center gap-2">
             <div className="inline-flex p-1 bg-neutral-quaternary rounded-xl border border-neutral-tertiary">
               <button
                 type="button"
@@ -733,11 +995,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           </div>
 
           {/* Location Selector */}
-          <div
-            className={
-              deskStaffList.length > 0 ? "md:col-span-3" : "md:col-span-3"
-            }
-          >
+          <div className="md:col-span-3">
             <div className="relative">
               <MapPin className="w-3.5 h-3.5 text-grey-5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
@@ -759,40 +1017,8 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
             </div>
           </div>
 
-          {/* Desk Staff Selector (shown when desk team members exist) */}
-          {deskStaffList.length > 0 && (
-            <div className="md:col-span-2">
-              <div className="relative">
-                <UserCheck className="w-3.5 h-3.5 text-grey-5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <select
-                  value={activeStaffId ?? ""}
-                  onChange={(e) =>
-                    setActiveStaffId(
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
-                  className="w-full pl-8 pr-8 py-2 bg-neutral-quaternary border border-neutral-tertiary rounded-xl text-xs font-bold text-dark-1 focus:outline-none focus:border-primary-base focus:ring-2 focus:ring-primary-base/20 appearance-none transition-all cursor-pointer truncate"
-                  title="Front Desk Team Member on Shift"
-                >
-                  <option value="">Desk: Signed In</option>
-                  {deskStaffList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                      {!s.accepted ? " (invited)" : ""}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-grey-5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-          )}
-
           {/* Search bar */}
-          <div
-            className={
-              deskStaffList.length > 0 ? "md:col-span-3" : "md:col-span-4"
-            }
-          >
+          <div className="md:col-span-4">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-grey-5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -1061,6 +1287,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           onUndoAction={handleUndoAction}
           isLoggingAction={logActionMutation.isPending}
           undoingEntryId={undoingEntryId}
+          isFetchingActions={isFetchingClientActions}
           togglingRowKey={togglingRowKey}
           copiedId={copiedId}
           onCopyId={handleCopyId}
@@ -1127,10 +1354,13 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
                     onUndoAction={handleUndoAction}
                     isLoggingAction={logActionMutation.isPending}
                     undoingEntryId={undoingEntryId}
-                    isToggling={
-                      togglingRowKey ===
-                      (booking.clubready_user_id || booking.booking_id)
-                    }
+                    isFetchingActions={isFetchingClientActions}
+                    isToggling={Boolean(
+                      togglingRowKey &&
+                        (togglingRowKey === booking.clubready_user_id ||
+                          togglingRowKey === booking.booking_id ||
+                          togglingRowKey === actionRowKey(booking, idx))
+                    )}
                     copiedId={copiedId}
                     onCopyId={handleCopyId}
                     formatUtcDateTime={formatUtcDateTime}
@@ -1180,6 +1410,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         initialGoal={goalModalState.goal}
         staffList={deskStaffList}
         activeStaffId={activeStaffId}
+        activeStaffMember={currentStaff}
       />
 
       {/* Reusable Follow-up Note Slide-over Drawer */}
@@ -1206,9 +1437,10 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
         }}
         isTogglingFollowUp={Boolean(
           noteModalVisit &&
-          togglingRowKey ===
-          (noteModalVisit.row.booking_id ??
-            `fv:${noteModalVisit.row.clubready_user_id}:${noteModalVisit.row.intake?.location_id ?? ""}`)
+            togglingRowKey &&
+            (togglingRowKey === noteModalVisit.row.clubready_user_id ||
+              togglingRowKey === noteModalVisit.row.booking_id ||
+              togglingRowKey === actionRowKey(noteModalVisit.row, 0))
         )}
         noteText={noteModalVisit?.noteText || ""}
         onChangeNote={(txt) =>

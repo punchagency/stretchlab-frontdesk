@@ -7,7 +7,7 @@ export interface ClientActionsPaginationProps {
   totalItems: number;
   pageSize: number; // 0 indicates "All"
   pageSizeOptions?: { label: string; value: number }[];
-  itemLabel?: string; // e.g. "clients", "time slots"
+  itemLabel?: string; // e.g. "clients", "time slots" 
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: (newSize: number) => void;
 }
@@ -116,11 +116,10 @@ export const ClientActionsPagination: React.FC<ClientActionsPaginationProps> = (
                   key={pageNum}
                   type="button"
                   onClick={() => onPageChange(pageNum)}
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center ${
-                    isActive
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center ${isActive
                       ? "bg-primary-base text-white shadow-2xs"
                       : "bg-neutral-quaternary text-dark-1 hover:bg-neutral-tertiary border border-neutral-tertiary/60"
-                  }`}
+                    }`}
                 >
                   {pageNum}
                 </button>

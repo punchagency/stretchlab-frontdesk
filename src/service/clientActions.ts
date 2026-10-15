@@ -167,6 +167,7 @@ export interface ActionEntry {
 export interface DeskStaffMember {
   id: number;
   name: string;
+  email?: string;
   accepted: boolean;
 }
 
@@ -208,6 +209,15 @@ export interface ClientActionRow {
   booking_guidance?: BookingGuidance | null;
   badges: ActionBadge[];
   actions_taken: ActionEntry[] | null;
+  must_get?: MustGetItem[];
+}
+
+export interface MustGetItem {
+  action: ActionKind; // "intake_form" | "maps" | "book_next" | "goal"
+  badges: ActionBadge[]; // open badges from row.badges; [] when verified done in data
+  done: boolean | null; // true if logged today, false if open/undone, null if error
+  entry: ActionEntry | null; // the actions_taken entry that did it
+  can_undo: boolean; // true for intake_form, maps, book_next; false for goal
 }
 
 export interface ClientActionsSummary {
@@ -389,6 +399,20 @@ export const visitOfAction = (row: ClientActionRow) =>
 
 export const actionRowKey = (row: ClientActionRow, index: number): string =>
   row.booking_id ?? `fv:${row.clubready_user_id ?? index}:${row.intake?.location_id ?? ""}`;
+
+export const isRowCompleted = (row: ClientActionRow): boolean => {
+  if (row.must_get && row.must_get.length > 0) {
+    return row.must_get.every((item) => item.done === true);
+  }
+  return row.badges.length === 0;
+};
+
+export const getRowPendingActionsCount = (row: ClientActionRow): number => {
+  if (row.must_get && row.must_get.length > 0) {
+    return row.must_get.filter((item) => !item.done).length;
+  }
+  return row.badges.length;
+};
 
 // Action Log Look-Back Types & Service (Owner / Admin / Manager only)
 export interface CheckCounts {

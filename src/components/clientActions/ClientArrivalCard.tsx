@@ -11,21 +11,30 @@ import {
   Clock,
   Sparkles,
   Undo2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ClientActionRow,
   ActionEntry,
+  getDeskStaff,
+  isRowCompleted,
+  getRowPendingActionsCount,
 } from "../../service/clientActions";
-import { ActionBadgeChip } from "./ActionBadgeChip";
+import { ActionBadgeChip, MustGetChip } from "./ActionBadgeChip";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import { getUserInfo } from "../../utils/user";
 
 export interface ClientArrivalCardProps {
   row: ClientActionRow;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   onGoalClick: (row: ClientActionRow) => void;
   onToggleFollowUp: (row: ClientActionRow) => void;
   onOpenNoteDrawer: (row: ClientActionRow) => void;
@@ -34,6 +43,7 @@ export interface ClientArrivalCardProps {
   onUndoAction?: (entry: ActionEntry) => void;
   isLoggingAction?: boolean;
   undoingEntryId?: number | null;
+  isFetchingActions?: boolean;
   isToggling: boolean;
   copiedId: string | null;
   onCopyId: (id: string, e: React.MouseEvent) => void;
@@ -81,8 +91,19 @@ const ActionsTakenList: React.FC<{
   actions?: ActionEntry[] | null;
   onUndoAction?: (entry: ActionEntry) => void;
   undoingEntryId?: number | null;
-}> = ({ actions, onUndoAction, undoingEntryId }) => {
+  isFetchingActions?: boolean;
+}> = ({ actions, onUndoAction, undoingEntryId, isFetchingActions }) => {
   if (!actions || actions.length === 0) return null;
+
+  const { data: deskStaffResponse } = useQuery({
+    queryKey: ["frontdesk-staff"],
+    queryFn: () => getDeskStaff(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const staffList = deskStaffResponse?.data?.staff || [];
+  const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
+  const defaultStaff = staffList.find((s) => s.id === defaultStaffId);
+  const userInfo = getUserInfo();
 
   return (
     <div className="mt-2 pt-2 border-t border-neutral-tertiary/60 flex flex-wrap items-center gap-1.5">
@@ -91,9 +112,24 @@ const ActionsTakenList: React.FC<{
       </span>
       {actions.map((entry) => {
         const isUndoable =
-          entry.action === "maps" || entry.action === "book_next";
+          entry.action === "maps" ||
+          entry.action === "book_next" ||
+          entry.action === "intake_form";
         const timeStr = entry.done_at ? formatUtcTime(entry.done_at) : "";
-        const staffName = entry.staff_name || entry.done_by_name || "Desk";
+        const matchedStaff = entry.staff_id
+          ? staffList.find((s) => s.id === entry.staff_id)
+          : null;
+        const staffName =
+          entry.staff_name ||
+          matchedStaff?.name ||
+          matchedStaff?.email ||
+          (entry.done_by_name && !/^\s*desk\s*$/i.test(entry.done_by_name)
+            ? entry.done_by_name
+            : (defaultStaff?.name ||
+               defaultStaff?.email ||
+               userInfo?.name ||
+               userInfo?.email ||
+               "Front Desk"));
         const checkStatus = entry.check?.status || "pending";
 
         let statusBadge = null;
@@ -132,6 +168,8 @@ const ActionsTakenList: React.FC<{
                 ? "Intake Form"
                 : "Goal";
 
+        const isUndoDisabled = undoingEntryId === entry.id || Boolean(isFetchingActions);
+
         return (
           <TooltipProvider key={entry.id} delayDuration={150}>
             <Tooltip>
@@ -145,13 +183,24 @@ const ActionsTakenList: React.FC<{
                   {isUndoable && onUndoAction && (
                     <button
                       type="button"
-                      disabled={undoingEntryId === entry.id}
+                      disabled={isUndoDisabled}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isUndoDisabled) return;
                         onUndoAction(entry);
                       }}
-                      className="ml-0.5 p-0.5 text-zinc-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                      title="Undo this action log"
+                      className={`ml-0.5 p-0.5 rounded transition-colors ${
+                        isUndoDisabled
+                          ? "text-zinc-300 opacity-40 cursor-not-allowed hover:text-zinc-300"
+                          : "text-zinc-400 hover:text-rose-600 cursor-pointer"
+                      }`}
+                      title={
+                        undoingEntryId === entry.id
+                          ? "Withdrawing action log..."
+                          : isFetchingActions
+                            ? "Updating client actions..."
+                            : "Undo this action log"
+                      }
                     >
                       {undoingEntryId === entry.id ? (
                         <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
@@ -199,6 +248,8 @@ const ActionsTakenList: React.FC<{
 
 export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   row,
+  isCollapsed,
+  onToggleCollapse,
   onGoalClick,
   onToggleFollowUp,
   onOpenNoteDrawer,
@@ -207,6 +258,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   onUndoAction,
   isLoggingAction,
   undoingEntryId,
+  isFetchingActions,
   isToggling,
   copiedId,
   onCopyId,
@@ -214,8 +266,99 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
 }) => {
   const isStale = Boolean(row.stale);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
-  const hasActions = row.badges.length > 0;
-  const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
+  const isCompleted = isRowCompleted(row);
+  const pendingActionsCount = getRowPendingActionsCount(row);
+  const hasActions = pendingActionsCount > 0;
+  const hasGoalBadge =
+    row.badges.some((b) => b.startsWith("goal_")) ||
+    (row.must_get?.some((m) => m.action === "goal" && !m.done) ?? false);
+  const pendingMustGet = row.must_get
+    ? row.must_get.filter((item) => !item.done)
+    : [];
+
+  // Collapsed accordion strip (compact view when tasks are completed or slot is in the past)
+  if (isCollapsed) {
+    return (
+      <div
+        onClick={onToggleCollapse}
+        className={`group relative bg-white hover:bg-neutral-quaternary/50 rounded-xl px-3.5 py-2.5 border transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs hover:border-primary-base/40 ${
+          isCompleted
+            ? "border-emerald-200/90 bg-emerald-50/25"
+            : "border-neutral-tertiary"
+        }`}
+      >
+        {/* Left: Avatar, Client Name, Arrival time, First visit tag, Assigned flexologist */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-[10px] border shrink-0 ${
+              row.first_visit
+                ? "bg-primary-base text-white border-primary-base"
+                : "bg-primary-base/10 text-primary-base border-primary-base/20"
+            }`}
+          >
+            {getInitials(row.client_name)}
+          </div>
+
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="font-extrabold text-dark-1 text-xs sm:text-sm truncate">
+              {row.client_name || "Unknown Client"}
+            </span>
+
+            {(row.booking_start || row.booking_end) && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-grey-5 shrink-0">
+                <Clock className="w-3 h-3 text-grey-4" />
+                <span>{row.booking_start}</span>
+              </span>
+            )}
+
+            {row.first_visit && (
+              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black bg-amber-100 text-amber-950 border border-amber-200 shrink-0">
+                1st Visit
+              </span>
+            )}
+
+            {row.booking_with && (
+              <span className="text-[11px] text-grey-4 hidden md:inline truncate">
+                · with {row.booking_with}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Status badge & Expand chevron */}
+        <div className="flex items-center gap-2 shrink-0">
+          {isCompleted ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+              <Check className="w-3 h-3 text-emerald-600" />
+              <span>All Tasks Done</span>
+              {row.actions_taken && row.actions_taken.length > 0 && (
+                <span className="text-emerald-800/80 font-bold ml-0.5">
+                  ({row.actions_taken.length} logged)
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+              <span>{pendingActionsCount} pending</span>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse?.();
+            }}
+            className="p-1 rounded-lg text-grey-4 hover:text-dark-1 hover:bg-neutral-tertiary/60 transition-colors cursor-pointer"
+            title="Expand client details & actions"
+            aria-label="Expand client details"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -225,7 +368,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
         }`}
     >
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Left Section: Avatar, Client Name, CR ID, Session & Staff */}
+        {/* Left Section: Avatar, Client Name, CR ID, Session & Staff*/}
         <div className="flex items-start sm:items-center gap-3.5 min-w-0">
           <div className="relative shrink-0">
             <div
@@ -350,10 +493,39 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
 
         {/* Right Section: Badges & Fast Action Buttons */}
         <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap pt-2 lg:pt-0 border-t lg:border-t-0 border-neutral-tertiary/60">
-          {/* Action Badges */}
+          {/* Action Badges / Must Get Line */}
           <div className="flex flex-wrap items-center gap-1">
-            {row.badges.length === 0 ? (
+            {row.must_get ? (
+              pendingMustGet.length === 0 ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>✓ No Action Needed</span>
+                </span>
+              ) : (
+                <>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+                    Must Get:
+                  </span>
+                  {pendingMustGet.map((item) => (
+                    <MustGetChip
+                      key={item.action}
+                      item={item}
+                      row={row}
+                      onGoalClick={onGoalClick}
+                      onToggleFollowUp={onToggleFollowUp}
+                      onLogMaps={onLogMaps}
+                      onLogBookNext={onLogBookNext}
+                      onUndoAction={onUndoAction}
+                      isToggling={isToggling}
+                      isLoggingAction={isLoggingAction}
+                      undoingEntryId={undoingEntryId}
+                    />
+                  ))}
+                </>
+              )
+            ) : row.badges.length === 0 ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
                 <span>✓ No Action Needed</span>
               </span>
             ) : (
@@ -435,6 +607,27 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
               )}
             </div>
           )}
+
+          {/* Collapse Card Toggle Button */}
+          {onToggleCollapse && (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onToggleCollapse}
+                    className="p-2 rounded-xl border border-neutral-tertiary/70 bg-neutral-quaternary/40 hover:bg-neutral-quaternary hover:text-dark-1 text-grey-5 transition-all cursor-pointer shadow-2xs"
+                    aria-label="Collapse client card"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  <p className="font-semibold text-[11px]">Collapse Card</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
 
@@ -478,6 +671,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
         actions={row.actions_taken}
         onUndoAction={onUndoAction}
         undoingEntryId={undoingEntryId}
+        isFetchingActions={isFetchingActions}
       />
     </div>
   );
@@ -493,6 +687,7 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   onUndoAction,
   isLoggingAction,
   undoingEntryId,
+  isFetchingActions,
   isToggling,
   copiedId,
   onCopyId,
@@ -500,15 +695,25 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
 }) => {
   const isStale = Boolean(row.stale);
   const hasFollowUpNote = Boolean(row.intake?.follow_up?.note);
-  const hasActions = row.badges.length > 0;
-  const hasGoalBadge = row.badges.some((b) => b.startsWith("goal_"));
+  const isCompleted = isRowCompleted(row);
+  const pendingActionsCount = getRowPendingActionsCount(row);
+  const hasActions = pendingActionsCount > 0;
+  const hasGoalBadge =
+    row.badges.some((b) => b.startsWith("goal_")) ||
+    (row.must_get?.some((m) => m.action === "goal" && !m.done) ?? false);
+  const gridPendingMustGet = row.must_get
+    ? row.must_get.filter((item) => !item.done)
+    : [];
 
   return (
     <div
-      className={`group relative bg-white rounded-3xl p-5 border transition-all duration-200 hover:shadow-lg flex flex-col justify-between space-y-4 ${hasActions
-        ? "border-neutral-tertiary hover:border-primary-base/50"
-        : "border-neutral-tertiary/70 bg-neutral-quaternary/10 hover:border-neutral-tertiary"
-        }`}
+      className={`group relative bg-white rounded-3xl p-5 border transition-all duration-200 hover:shadow-lg flex flex-col justify-between space-y-4 ${
+        isCompleted
+          ? "border-emerald-200/90 bg-emerald-50/15 hover:border-emerald-300"
+          : hasActions
+            ? "border-neutral-tertiary hover:border-primary-base/50"
+            : "border-neutral-tertiary/70 bg-neutral-quaternary/10 hover:border-neutral-tertiary"
+      }`}
     >
       {/* Top Header: Time Pill & Status Badges */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -663,11 +868,40 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
         </div>
       )}
 
-      {/* Critical Action Badges */}
+      {/* Critical Action Badges / Must Get */}
       <div className="pt-2 border-t border-neutral-tertiary/60 min-h-[44px] flex items-center">
         <div className="flex flex-wrap items-center gap-1.5 w-full">
-          {row.badges.length === 0 ? (
+          {row.must_get ? (
+            gridPendingMustGet.length === 0 ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>✓ No Action Needed</span>
+              </span>
+            ) : (
+              <>
+                <span className="text-[11px] font-black uppercase tracking-wider text-grey-5 mr-0.5 shrink-0">
+                  Must Get:
+                </span>
+                {gridPendingMustGet.map((item) => (
+                  <MustGetChip
+                    key={item.action}
+                    item={item}
+                    row={row}
+                    onGoalClick={onGoalClick}
+                    onToggleFollowUp={onToggleFollowUp}
+                    onLogMaps={onLogMaps}
+                    onLogBookNext={onLogBookNext}
+                    onUndoAction={onUndoAction}
+                    isToggling={isToggling}
+                    isLoggingAction={isLoggingAction}
+                    undoingEntryId={undoingEntryId}
+                  />
+                ))}
+              </>
+            )
+          ) : row.badges.length === 0 ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
               <span>✓ No Action Needed</span>
             </span>
           ) : (
@@ -698,6 +932,7 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
         actions={row.actions_taken}
         onUndoAction={onUndoAction}
         undoingEntryId={undoingEntryId}
+        isFetchingActions={isFetchingActions}
       />
 
       {/* Footer: Quick Action Buttons */}

@@ -32,6 +32,8 @@ interface DataTableProps<TData> {
   searchKeys?: string[];
   enableSorting?: boolean;
   emptyMessage?: React.ReactNode;
+  fontSize?: "xs" | "sm";
+  className?: string;
 }
 
 export function DataTable<TData>({
@@ -47,6 +49,8 @@ export function DataTable<TData>({
   searchKeys,
   enableSorting = true,
   emptyMessage,
+  fontSize = "xs",
+  className,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -132,7 +136,7 @@ export function DataTable<TData>({
   }
 
   return (
-    <div className="w-full overflow-x-auto text-xs">
+    <div className={`w-full overflow-x-auto ${fontSize === "sm" ? "text-sm" : "text-xs"} ${className || ""}`}>
       {enableSearch && (
         <div className="p-4 border-b border-neutral-tertiary bg-white">
           <div className="relative max-w-md">
@@ -161,7 +165,9 @@ export function DataTable<TData>({
           {table.getHeaderGroups().map((headerGroup) => (
             <tr
               key={headerGroup.id}
-              className="bg-neutral-quaternary border-b border-neutral-tertiary text-grey-5 font-bold uppercase tracking-wider"
+              className={`bg-neutral-quaternary border-b border-neutral-tertiary text-grey-5 font-bold uppercase tracking-wider ${
+                fontSize === "sm" ? "text-xs" : "text-[10px]"
+              }`}
             >
               {headerGroup.headers.map((header) => (
                 <th

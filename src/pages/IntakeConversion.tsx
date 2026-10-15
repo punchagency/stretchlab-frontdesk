@@ -371,11 +371,11 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
                       </div>
                       <h3 className="text-2xl font-black text-dark-1 mb-1">
                         {conversionData?.first_visits_with_intake_form_rate !== undefined
-                          ? `${conversionData.first_visits_with_intake_form_rate}%`
+                          ? `${Math.round(conversionData.first_visits_with_intake_form_rate)}%`
                           : conversionData?.intake_form_submission_rate !== undefined
-                            ? `${conversionData.intake_form_submission_rate}%`
+                            ? `${Math.round(conversionData.intake_form_submission_rate)}%`
                             : conversionData?.conversion_percentage !== undefined
-                              ? `${conversionData.conversion_percentage}%`
+                              ? `${Math.round(conversionData.conversion_percentage)}%`
                               : "0%"}
                       </h3>
                       <p className="text-[10px] text-grey-5 font-medium">
@@ -428,8 +428,8 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
                       </div>
                       <h3 className="text-2xl font-black text-dark-1 mb-1">
                         {conversionData?.conversion_rate_with_intake_form !== undefined
-                          ? `${conversionData.conversion_rate_with_intake_form}%`
-                          : `${conversionData?.matched_conversion_percentage ?? 0}%`}
+                          ? `${Math.round(conversionData.conversion_rate_with_intake_form)}%`
+                          : `${Math.round(conversionData?.matched_conversion_percentage ?? 0)}%`}
                       </h3>
                       <p className="text-[10px] text-grey-5 font-medium truncate">
                         {conversionData?.first_visit_conversions_with_intake_form ?? 0} converted / {conversionData?.first_visits_with_intake_form ?? conversionData?.first_visits_from_intake_form ?? 0} visits
@@ -473,7 +473,7 @@ export const IntakeConversion = ({ hideHeader = false }: { hideHeader?: boolean 
                       </div>
                       <h3 className="text-2xl font-black text-dark-1 mb-1">
                         {conversionData?.conversion_rate_without_intake_form !== undefined
-                          ? `${conversionData.conversion_rate_without_intake_form}%`
+                          ? `${Math.round(conversionData.conversion_rate_without_intake_form)}%`
                           : "0%"}
                       </h3>
                       <p className="text-[10px] text-grey-5 font-medium truncate">

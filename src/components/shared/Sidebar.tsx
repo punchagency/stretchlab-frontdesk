@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target } from "lucide-react";
+import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target, FileText } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
 import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
 import { logout } from "../../service/auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getDeskStaff, DeskStaffMember } from "../../service/clientActions";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -18,6 +20,16 @@ const menuItems = [
     title: "Client Actions",
     path: "/",
     icon: Target,
+  },
+  // {
+  //   title: "Opportunities",
+  //   path: "/opportunities",
+  //   icon: Sparkles,
+  // },
+  {
+    title: "Client Intakes",
+    path: "/client-intakes",
+    icon: FileText,
   },
   {
     title: "First Visits",
@@ -55,6 +67,40 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const canAccessAdmin = hasRole(userInfo, [1, 2, 4]);
   const canAccessNoteApp = hasRole(userInfo, [3]);
 
+  // Fetch Front Desk Staff to resolve logged-in frontdesk name
+  const { data: deskStaffResponse } = useQuery({
+    queryKey: ["frontdesk-staff"],
+    queryFn: () => getDeskStaff(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const deskStaffList = deskStaffResponse?.data?.staff || [];
+  const defaultStaffId = deskStaffResponse?.data?.default_staff_id;
+
+  const currentStaff = useMemo<DeskStaffMember | null>(() => {
+    const loggedInEmail = userInfo?.email?.toLowerCase().trim() || "";
+    const loggedInUsername = userInfo?.username?.toLowerCase().trim() || "";
+
+    if (defaultStaffId !== null && defaultStaffId !== undefined) {
+      const found = deskStaffList.find((s) => s.id === defaultStaffId);
+      if (found) return found;
+    }
+
+    if (loggedInEmail || loggedInUsername) {
+      const found = deskStaffList.find((s) => {
+        const staffEmail = s.email?.toLowerCase().trim();
+        const staffName = s.name?.toLowerCase().trim();
+        return (
+          (loggedInEmail && (staffEmail === loggedInEmail || staffName === loggedInEmail)) ||
+          (loggedInUsername && (staffEmail === loggedInUsername || staffName === loggedInUsername))
+        );
+      });
+      if (found) return found;
+    }
+
+    return null;
+  }, [deskStaffList, defaultStaffId, userInfo]);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -74,14 +120,18 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     return location.pathname === path;
   };
 
-
-  const displayName =
+  const fallbackDisplayName =
     userInfo?.name ||
     userInfo?.username ||
     userInfo?.clubready_accounts?.[0]?.name ||
     "Front Desk";
 
-  const userEmail = userInfo?.email || "frontdesk@stretchnote.com";
+  const displayName =
+    currentStaff?.name ||
+    currentStaff?.email ||
+    fallbackDisplayName;
+
+  const userEmail = currentStaff?.email || userInfo?.email || "frontdesk@stretchnote.com";
 
   const sidebarContent = (
     <aside className="w-72 h-full bg-white border-r border-neutral-tertiary flex flex-col overflow-hidden shadow-2xl md:shadow-none">

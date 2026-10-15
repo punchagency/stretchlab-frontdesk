@@ -504,12 +504,84 @@ export const sendIntakeEmail = async (submissionId: number | string) => {
   );
   return response.data;
 };
-
 export const previewIntakeEmail = async (submissionId: number | string) => {
   const response = await api.get<IntakeEmailPreviewResponse>(
     `/frontdesk/intake/${submissionId}/email-preview`
   );
   return response.data;
 };
+
+export interface SendIntakeEmailToResponse {
+  status: string;
+  message: string;
+  data: {
+    submission_id: number;
+    recipients: string[];
+    failed: { email: string; error: string }[];
+    location_id: string;
+    location_name: string;
+    client_name: string;
+    subject: string;
+    summary_included: boolean;
+  };
+}
+
+export const sendIntakeEmailTo = async (
+  submissionId: number | string,
+  emails: string[]
+) => {
+  const response = await api.post<SendIntakeEmailToResponse>(
+    `/frontdesk/intake/${submissionId}/email-to`,
+    { emails }
+  );
+  return response.data;
+};
+
+// ─── Intake Form Auto-Send Settings API ────────────────────────────────────────
+
+export interface LocationIntakeAutosend {
+  location_id: string;
+  location_name: string;
+  team_email: string | null;
+  enabled: boolean;
+  emails: string[];
+}
+
+export interface IntakeAutosendSettingsResponse {
+  status: string;
+  message: string;
+  max_emails: number;
+  data: LocationIntakeAutosend[];
+}
+
+export interface SaveIntakeAutosendPayload {
+  location_id: string | number;
+  enabled: boolean;
+  emails?: string[];
+}
+
+export interface SaveIntakeAutosendResponse {
+  status: string;
+  message: string;
+  data: LocationIntakeAutosend;
+}
+
+export const getIntakeAutosendSettings = async () => {
+  const response = await api.get<IntakeAutosendSettingsResponse>(
+    "/admin/settings/intake-autosend"
+  );
+  return response.data;
+};
+
+export const saveIntakeAutosendSettings = async (
+  payload: SaveIntakeAutosendPayload
+) => {
+  const response = await api.post<SaveIntakeAutosendResponse>(
+    "/admin/settings/intake-autosend",
+    payload
+  );
+  return response.data;
+};
+
 
 

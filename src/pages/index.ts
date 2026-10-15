@@ -9,3 +9,5 @@ export * from "./ReviewInbox";
 export * from "./GoalsPage";
 export * from "./ReviewsPage";
 export * from "./ClientActionsPage";
+export * from "./ClientIntakesPage";
+export * from "./OpportunitiesPage";
