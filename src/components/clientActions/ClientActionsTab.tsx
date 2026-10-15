@@ -157,6 +157,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const {
     data: clientActionsResponse,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -902,7 +903,14 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     });
   };
 
+  const isFetchingClientActions =
+    isFetching ||
+    toggleFollowUpMutation.isPending ||
+    logActionMutation.isPending ||
+    undoActionMutation.isPending;
+
   const handleUndoAction = (entry: ActionEntry) => {
+    if (isFetchingClientActions) return;
     undoActionMutation.mutate({ entryId: entry.id });
   };
 
@@ -1279,6 +1287,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           onUndoAction={handleUndoAction}
           isLoggingAction={logActionMutation.isPending}
           undoingEntryId={undoingEntryId}
+          isFetchingActions={isFetchingClientActions}
           togglingRowKey={togglingRowKey}
           copiedId={copiedId}
           onCopyId={handleCopyId}
@@ -1345,6 +1354,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
                     onUndoAction={handleUndoAction}
                     isLoggingAction={logActionMutation.isPending}
                     undoingEntryId={undoingEntryId}
+                    isFetchingActions={isFetchingClientActions}
                     isToggling={Boolean(
                       togglingRowKey &&
                         (togglingRowKey === booking.clubready_user_id ||

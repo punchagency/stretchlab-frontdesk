@@ -32,6 +32,7 @@ interface ClientArrivalTimelineProps {
   onUndoAction?: (entry: ActionEntry) => void;
   isLoggingAction?: boolean;
   undoingEntryId?: number | null;
+  isFetchingActions?: boolean;
   togglingRowKey: string | null;
   copiedId: string | null;
   onCopyId: (id: string, e: React.MouseEvent) => void;
@@ -87,6 +88,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   onUndoAction,
   isLoggingAction,
   undoingEntryId,
+  isFetchingActions,
   togglingRowKey,
   copiedId,
   onCopyId,
@@ -740,6 +742,7 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                         onUndoAction={onUndoAction}
                         isLoggingAction={isLoggingAction}
                         undoingEntryId={undoingEntryId}
+                        isFetchingActions={isFetchingActions}
                         isToggling={isToggling}
                         copiedId={copiedId}
                         onCopyId={onCopyId}

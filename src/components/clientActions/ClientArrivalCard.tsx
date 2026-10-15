@@ -43,6 +43,7 @@ export interface ClientArrivalCardProps {
   onUndoAction?: (entry: ActionEntry) => void;
   isLoggingAction?: boolean;
   undoingEntryId?: number | null;
+  isFetchingActions?: boolean;
   isToggling: boolean;
   copiedId: string | null;
   onCopyId: (id: string, e: React.MouseEvent) => void;
@@ -90,7 +91,8 @@ const ActionsTakenList: React.FC<{
   actions?: ActionEntry[] | null;
   onUndoAction?: (entry: ActionEntry) => void;
   undoingEntryId?: number | null;
-}> = ({ actions, onUndoAction, undoingEntryId }) => {
+  isFetchingActions?: boolean;
+}> = ({ actions, onUndoAction, undoingEntryId, isFetchingActions }) => {
   if (!actions || actions.length === 0) return null;
 
   const { data: deskStaffResponse } = useQuery({
@@ -166,6 +168,8 @@ const ActionsTakenList: React.FC<{
                 ? "Intake Form"
                 : "Goal";
 
+        const isUndoDisabled = undoingEntryId === entry.id || Boolean(isFetchingActions);
+
         return (
           <TooltipProvider key={entry.id} delayDuration={150}>
             <Tooltip>
@@ -179,13 +183,24 @@ const ActionsTakenList: React.FC<{
                   {isUndoable && onUndoAction && (
                     <button
                       type="button"
-                      disabled={undoingEntryId === entry.id}
+                      disabled={isUndoDisabled}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isUndoDisabled) return;
                         onUndoAction(entry);
                       }}
-                      className="ml-0.5 p-0.5 text-zinc-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                      title="Undo this action log"
+                      className={`ml-0.5 p-0.5 rounded transition-colors ${
+                        isUndoDisabled
+                          ? "text-zinc-300 opacity-40 cursor-not-allowed hover:text-zinc-300"
+                          : "text-zinc-400 hover:text-rose-600 cursor-pointer"
+                      }`}
+                      title={
+                        undoingEntryId === entry.id
+                          ? "Withdrawing action log..."
+                          : isFetchingActions
+                            ? "Updating client actions..."
+                            : "Undo this action log"
+                      }
                     >
                       {undoingEntryId === entry.id ? (
                         <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
@@ -243,6 +258,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   onUndoAction,
   isLoggingAction,
   undoingEntryId,
+  isFetchingActions,
   isToggling,
   copiedId,
   onCopyId,
@@ -655,6 +671,7 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
         actions={row.actions_taken}
         onUndoAction={onUndoAction}
         undoingEntryId={undoingEntryId}
+        isFetchingActions={isFetchingActions}
       />
     </div>
   );
@@ -670,6 +687,7 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   onUndoAction,
   isLoggingAction,
   undoingEntryId,
+  isFetchingActions,
   isToggling,
   copiedId,
   onCopyId,
@@ -914,6 +932,7 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
         actions={row.actions_taken}
         onUndoAction={onUndoAction}
         undoingEntryId={undoingEntryId}
+        isFetchingActions={isFetchingActions}
       />
 
       {/* Footer: Quick Action Buttons */}

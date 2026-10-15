@@ -537,4 +537,51 @@ export const sendIntakeEmailTo = async (
   return response.data;
 };
 
+// ─── Intake Form Auto-Send Settings API ────────────────────────────────────────
+
+export interface LocationIntakeAutosend {
+  location_id: string;
+  location_name: string;
+  team_email: string | null;
+  enabled: boolean;
+  emails: string[];
+}
+
+export interface IntakeAutosendSettingsResponse {
+  status: string;
+  message: string;
+  max_emails: number;
+  data: LocationIntakeAutosend[];
+}
+
+export interface SaveIntakeAutosendPayload {
+  location_id: string | number;
+  enabled: boolean;
+  emails?: string[];
+}
+
+export interface SaveIntakeAutosendResponse {
+  status: string;
+  message: string;
+  data: LocationIntakeAutosend;
+}
+
+export const getIntakeAutosendSettings = async () => {
+  const response = await api.get<IntakeAutosendSettingsResponse>(
+    "/admin/settings/intake-autosend"
+  );
+  return response.data;
+};
+
+export const saveIntakeAutosendSettings = async (
+  payload: SaveIntakeAutosendPayload
+) => {
+  const response = await api.post<SaveIntakeAutosendResponse>(
+    "/admin/settings/intake-autosend",
+    payload
+  );
+  return response.data;
+};
+
+
 

@@ -21,6 +21,11 @@ const menuItems = [
     path: "/",
     icon: Target,
   },
+  // {
+  //   title: "Opportunities",
+  //   path: "/opportunities",
+  //   icon: Sparkles,
+  // },
   {
     title: "Client Intakes",
     path: "/client-intakes",

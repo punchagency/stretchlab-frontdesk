@@ -9,6 +9,7 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  Settings2,
 } from "lucide-react";
 import {
   getFrontdeskHome,
@@ -17,6 +18,8 @@ import {
 } from "../service/home";
 import { DataTable } from "../components/shared";
 import { SendIntakePeopleModal } from "../components/intake/SendIntakePeopleModal";
+import { IntakeAutosendModal } from "../components/intake/IntakeAutosendModal";
+import { getUserInfo, hasRole } from "../utils/user";
 
 const getInitials = (name?: string | null) => {
   if (!name) return "??";
@@ -69,6 +72,11 @@ export const ClientIntakesPage: React.FC = () => {
 
   // Email Modal State
   const [emailSub, setEmailSub] = useState<IntakeSubmission | null>(null);
+
+  // Auto-Send Settings Modal State & Role check (Owner=1, Admin=2, Manager=4)
+  const [isAutosendModalOpen, setIsAutosendModalOpen] = useState(false);
+  const userInfo = useMemo(() => getUserInfo(), []);
+  const canManageAutosend = useMemo(() => hasRole(userInfo, [1, 2, 4]), [userInfo]);
 
   const todayStr = getIsoDateStr(0);
   const tomorrowStr = getIsoDateStr(1);
@@ -230,6 +238,15 @@ export const ClientIntakesPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
+            {canManageAutosend && (
+              <button
+                onClick={() => setIsAutosendModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-base hover:bg-primary-base/90 text-white font-extrabold rounded-xl text-xs transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                <Settings2 className="w-4 h-4" />
+                <span>Auto-Send Settings</span>
+              </button>
+            )}
             <button
               onClick={() => refetch()}
               disabled={isRefetching}
@@ -456,6 +473,14 @@ export const ClientIntakesPage: React.FC = () => {
         onClose={() => setEmailSub(null)}
         onSuccess={() => refetch()}
       />
+
+      {/* Intake Auto-Send Settings Modal */}
+      {canManageAutosend && (
+        <IntakeAutosendModal
+          isOpen={isAutosendModalOpen}
+          onClose={() => setIsAutosendModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
