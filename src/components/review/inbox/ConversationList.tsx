@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import type { ConversationItem } from "../../../types/reviewInbox";
 import { ConversationListItem } from "./ConversationListItem";
 import { MessageSquare, Loader2, Info } from "lucide-react";
@@ -15,6 +15,9 @@ interface ConversationListProps {
   selectedClientNumber: string | null;
   onSelectClientNumber: (clientNumber: string) => void;
   isLoading: boolean;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   unreadOnly: boolean;
@@ -31,6 +34,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   selectedClientNumber,
   onSelectClientNumber,
   isLoading,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
   searchQuery,
   onSearchChange,
   unreadOnly,
@@ -41,6 +47,27 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   totalCount,
   isTruncated,
 }) => {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!hasMore || isLoading || isLoadingMore || !onLoadMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: "150px" }
+    );
+
+    const el = sentinelRef.current;
+    if (el) observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, [hasMore, isLoading, isLoadingMore, onLoadMore]);
   const filteredConversations = conversations.filter((item) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -171,6 +198,32 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               onSelect={onSelectClientNumber}
             />
           ))}
+
+        {/* Infinite Scroll Sentinel & Status */}
+        {!isLoading && filteredConversations.length > 0 && (
+          <div ref={sentinelRef} className="p-3 text-center">
+            {isLoadingMore ? (
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-5 font-semibold py-1">
+                <Loader2 className="w-4 h-4 animate-spin text-primary-base" />
+                <span>Loading more conversations...</span>
+              </div>
+            ) : hasMore ? (
+              <button
+                type="button"
+                onClick={onLoadMore}
+                className="text-xs font-bold text-primary-base hover:underline py-1"
+              >
+                Load more conversations
+              </button>
+            ) : (
+              <p className="text-[11px] text-grey-4 font-medium py-1">
+                {conversations.length >= totalCount
+                  ? `Showing all ${conversations.length} conversations`
+                  : `Showing recent ${conversations.length} conversations`}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

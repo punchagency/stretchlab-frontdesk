@@ -22,6 +22,9 @@ export const getConversations = async (
   if (params?.limit) {
     queryParams.limit = params.limit;
   }
+  if (params?.offset !== undefined) {
+    queryParams.offset = params.offset;
+  }
   if (params?.scan) {
     queryParams.scan = params.scan;
   }

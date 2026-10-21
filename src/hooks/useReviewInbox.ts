@@ -37,6 +37,7 @@ export const useConversations = (
     queryFn: () => getConversations(params),
     refetchInterval: refetchIntervalMs,
     staleTime: 5000,
+    placeholderData: (previousData) => previousData,
   });
 };
 

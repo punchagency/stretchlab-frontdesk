@@ -1,6 +1,8 @@
 import React from "react";
 import type { ConversationItem } from "../../../types/reviewInbox";
 
+import { formatMessageRelativeTime } from "../../../utils/date";
+
 interface ConversationListItemProps {
   item: ConversationItem;
   isSelected: boolean;
@@ -15,27 +17,6 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   const displayName = item.client_name || item.client_number;
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
 
-  const formatRelativeTime = (isoString: string | null) => {
-    if (!isoString) return "";
-    try {
-      const date = new Date(isoString);
-      if (isNaN(date.getTime())) return "";
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-      if (diffMins < 1) return "Just now";
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays === 1) return "Yesterday";
-      if (diffDays < 7) return `${diffDays}d ago`;
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
-    } catch {
-      return "";
-    }
-  };
 
   return (
     <div
@@ -75,7 +56,7 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
             {displayName}
           </h4>
           <span className="text-[10px] text-grey-5 shrink-0 font-medium">
-            {formatRelativeTime(item.last_message_at)}
+            {formatMessageRelativeTime(item.last_message_at)}
           </span>
         </div>
 
