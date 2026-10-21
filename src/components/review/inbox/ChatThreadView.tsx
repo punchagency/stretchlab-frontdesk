@@ -16,7 +16,7 @@ interface ChatThreadViewProps {
   clientName: string | null;
   messages: ChatMessage[];
   isLoading: boolean;
-  isFetching: boolean;
+  isRefreshing?: boolean;
   onRefresh: () => void;
   onSendMessage: (body: string) => Promise<void>;
   isSending: boolean;
@@ -30,7 +30,7 @@ export const ChatThreadView: React.FC<ChatThreadViewProps> = ({
   clientName,
   messages,
   isLoading,
-  isFetching,
+  isRefreshing = false,
   onRefresh,
   onSendMessage,
   isSending,
@@ -122,10 +122,10 @@ export const ChatThreadView: React.FC<ChatThreadViewProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onRefresh}
-            disabled={isFetching}
+            disabled={isRefreshing}
             className="px-3.5 py-2 rounded-xl bg-neutral-quaternary hover:bg-neutral-tertiary text-grey-5 font-bold text-xs flex items-center gap-1.5 transition-all border border-neutral-tertiary disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-primary-base ${isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-primary-base ${isRefreshing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>

@@ -14,6 +14,8 @@ export interface ConversationsResponse {
   total: number;
   truncated: boolean;
   limit: number;
+  offset?: number;
+  has_more?: boolean;
 }
 
 export interface ChatMessage {
@@ -56,6 +58,7 @@ export interface FetchConversationsParams {
   location_id?: number | string;
   unread_only?: boolean;
   limit?: number;
+  offset?: number;
   scan?: number;
 }
 

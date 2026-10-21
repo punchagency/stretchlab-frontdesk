@@ -15,23 +15,30 @@ export const ReviewInboxView: React.FC = () => {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [locationId, setLocationId] = useState("all");
   const [mobileActiveView, setMobileActiveView] = useState<"list" | "thread">("list");
+  const [limit, setLimit] = useState(50);
+
+  // Reset pagination limit when filters change
+  useEffect(() => {
+    setLimit(50);
+  }, [locationId, unreadOnly]);
 
   const { data: locationsData = [] } = useReviewLocations();
 
   const {
     data: conversationsData,
     isLoading: isLoadingConversations,
+    isFetching: isFetchingConversations,
     refetch: refetchConversations,
   } = useConversations({
     location_id: locationId === "all" ? undefined : locationId,
     unread_only: unreadOnly,
-    limit: 50,
+    limit,
   });
 
   const {
     data: threadData,
     isLoading: isLoadingThread,
-    isFetching: isFetchingThread,
+
     refetch: refetchThread,
   } = useConversationThread(selectedClientNumber, true);
 
@@ -85,26 +92,48 @@ export const ReviewInboxView: React.FC = () => {
   const conversations = conversationsData?.conversations || [];
   const totalCount = conversationsData?.total || conversations.length;
   const isTruncated = Boolean(conversationsData?.truncated);
+  const hasMore = conversations.length < totalCount && limit < 200;
+  const isLoadingMore = isFetchingConversations && !isLoadingConversations;
+
+  const handleLoadMore = () => {
+    if (hasMore && !isFetchingConversations) {
+      setLimit((prev) => Math.min(prev + 50, 200));
+    }
+  };
+
   const activeThreadMessages = threadData?.messages || [];
   const activeClientName =
     threadData?.client_name ||
     conversations.find((c) => c.client_number === selectedClientNumber)?.client_name ||
     null;
 
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.all([refetchThread(), refetchConversations()]);
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-16rem)] min-h-[550px] max-h-[900px] w-full overflow-hidden rounded-3xl border border-neutral-tertiary bg-white shadow-xs">
       <div className="flex-1 flex overflow-hidden w-full relative">
         {/* Left Panel: Conversation List */}
         <div
-          className={`w-full sm:w-[320px] md:w-[350px] lg:w-[380px] shrink-0 h-full overflow-hidden ${
-            mobileActiveView === "thread" ? "hidden sm:block" : "block"
-          }`}
+          className={`w-full sm:w-[320px] md:w-[350px] lg:w-[380px] shrink-0 h-full overflow-hidden ${mobileActiveView === "thread" ? "hidden sm:block" : "block"
+            }`}
         >
           <ConversationList
             conversations={conversations}
             selectedClientNumber={selectedClientNumber}
             onSelectClientNumber={handleSelectClient}
             isLoading={isLoadingConversations}
+            isLoadingMore={isLoadingMore}
+            hasMore={hasMore}
+            onLoadMore={handleLoadMore}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             unreadOnly={unreadOnly}
@@ -119,20 +148,16 @@ export const ReviewInboxView: React.FC = () => {
 
         {/* Right Panel: Chat Thread View */}
         <div
-          className={`flex-1 h-full overflow-hidden w-full ${
-            mobileActiveView === "list" ? "hidden sm:flex" : "flex"
-          }`}
+          className={`flex-1 h-full overflow-hidden w-full ${mobileActiveView === "list" ? "hidden sm:flex" : "flex"
+            }`}
         >
           <ChatThreadView
             clientNumber={selectedClientNumber}
             clientName={activeClientName}
             messages={activeThreadMessages}
             isLoading={isLoadingThread}
-            isFetching={isFetchingThread}
-            onRefresh={() => {
-              refetchThread();
-              refetchConversations();
-            }}
+            isRefreshing={isManualRefreshing}
+            onRefresh={handleManualRefresh}
             onSendMessage={handleSendMessage}
             isSending={sendMessageMutation.isPending}
             onBackToList={() => setMobileActiveView("list")}

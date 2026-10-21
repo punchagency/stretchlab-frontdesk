@@ -2,6 +2,8 @@ import React from "react";
 import type { ChatMessage } from "../../../types/reviewInbox";
 import { Check, CheckCheck, AlertTriangle, Bot, UserCheck, User } from "lucide-react";
 
+import { formatMessageTime } from "../../../utils/date";
+
 interface ChatMessageBubbleProps {
   message: ChatMessage;
 }
@@ -9,15 +11,6 @@ interface ChatMessageBubbleProps {
 export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message }) => {
   const isOutbound = message.direction === "outbound";
 
-  const formatTimestamp = (isoString: string) => {
-    try {
-      const date = new Date(isoString);
-      if (isNaN(date.getTime())) return "";
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "";
-    }
-  };
 
   const getSourceBadge = () => {
     if (message.source === "automation") {
@@ -72,7 +65,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
       <div className="flex items-center gap-2 mb-1 px-1">
         {getSourceBadge()}
         <span className="text-[10px] text-grey-5 font-medium">
-          {formatTimestamp(message.created_at)}
+          {formatMessageTime(message.created_at)}
         </span>
       </div>
 
