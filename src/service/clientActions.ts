@@ -100,7 +100,13 @@ export interface ClientGoalsData {
 
 export type ActionKind = "intake_form" | "maps" | "book_next" | "goal";
 
-export type CheckStatus = "confirmed" | "pending" | "not_confirmed" | "cant_check";
+export type CheckStatus =
+  | "confirmed"
+  | "partial"
+  | "needs_detail"
+  | "pending"
+  | "not_confirmed"
+  | "cant_check";
 
 export interface MapsEvidence {
   reading: string | null;
@@ -112,8 +118,10 @@ export interface MapsEvidence {
 
 export interface BookNextEvidence {
   claimed: number | null;
+  needed: number | null; // short of the target at tap; null = before 2026-10-21 / no target
   found: number; // appointments (days)
   found_bookings?: number; // total bookings
+  found_by_client?: number | null; // appointments booked online by client
   made_on: Day | null;
   bookings: {
     booking_id: string | null;
@@ -121,6 +129,7 @@ export interface BookNextEvidence {
     booking_start: string | null;
     location_name: string | null;
     booking_made_by: string | null;
+    booked_by_client?: boolean | null; // true when booked online by client
     made_at: string | null; // ClubReady's log time, studio-local
   }[];
   confirmed_at: UtcStamp | null;
@@ -133,6 +142,9 @@ export interface IntakeEvidence {
 
 export interface GoalEvidence {
   client_goal_id: number | null;
+  goal?: string | null;
+  why?: string | null;
+  template_clients?: number | null;
 }
 
 export interface ActionCheck {
@@ -421,7 +433,14 @@ export interface CheckCounts {
   pending: number;
   not_confirmed: number;
   cant_check: number;
+  partial: number;
+  needs_detail: number;
   unchecked: number;
+  decided: number;
+  accuracy: number | null;
+  needed: number;
+  booked: number;
+  fill_rate: number | null;
 }
 
 export interface ActionLogEntry extends ActionEntry {
@@ -437,11 +456,23 @@ export interface ActionLogStaffRow extends CheckCounts {
   by_action: Partial<Record<ActionKind, CheckCounts>>;
 }
 
+export interface ActionLogLocationRow extends CheckCounts {
+  location_name: string | null;
+  by_action: Partial<Record<ActionKind, CheckCounts>>;
+}
+
+export interface ActionLogWeekRow extends CheckCounts {
+  week_of: Day;
+  by_action: Partial<Record<ActionKind, CheckCounts>>;
+}
+
 export interface ActionLogData {
   admin_id: number;
   window: { from: Day; to: Day; today: Day };
   entries: ActionLogEntry[];
   by_staff: ActionLogStaffRow[];
+  by_location: ActionLogLocationRow[];
+  by_week: ActionLogWeekRow[];
   summary: CheckCounts & { by_action: Partial<Record<ActionKind, CheckCounts>> };
 }
 

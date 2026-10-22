@@ -139,6 +139,22 @@ const ActionsTakenList: React.FC<{
               <Check className="w-2.5 h-2.5" /> Confirmed
             </span>
           );
+        } else if (checkStatus === "partial") {
+          const bkEvidence = entry.action === "book_next" ? (entry.check?.evidence as any) : null;
+          const found = bkEvidence?.found ?? 0;
+          const needed = bkEvidence?.needed;
+          const partialText = needed != null ? `Booked ${found} of ${needed}` : `Booked ${found}`;
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+              {partialText}
+            </span>
+          );
+        } else if (checkStatus === "needs_detail") {
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
+              Needs detail
+            </span>
+          );
         } else if (checkStatus === "pending") {
           statusBadge = (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
@@ -147,8 +163,14 @@ const ActionsTakenList: React.FC<{
           );
         } else if (checkStatus === "not_confirmed") {
           statusBadge = (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
               Not Confirmed
+            </span>
+          );
+        } else if (checkStatus === "cant_check") {
+          statusBadge = (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">
+              Can't check
             </span>
           );
         } else {
@@ -169,6 +191,43 @@ const ActionsTakenList: React.FC<{
                 : "Goal";
 
         const isUndoDisabled = undoingEntryId === entry.id || Boolean(isFetchingActions);
+
+        const reasonHumanText = (reason?: string) => {
+          if (!reason) return null;
+          switch (reason) {
+            case "fewer_than_needed":
+              return "Fewer appointments booked than needed to meet target";
+            case "no_new_booking":
+              return "No new bookings found for later days";
+            case "new_booking":
+              return "Appointments booked covering target";
+            case "no_why":
+              return "No personal why on file for client";
+            case "generic_goal":
+              return "Generic template goal given to 3+ clients";
+            case "generic_goal_no_why":
+              return "Template goal words and no personal why";
+            case "goal_saved":
+              return "Goal recorded with personal why";
+            case "form_in_by_visit":
+              return "Intake form received by visit day";
+            case "awaiting_form":
+              return "Awaiting form submission (normal prior to visit)";
+            case "no_form_by_visit":
+              return "No intake form received by end of visit day";
+            case "form_after_visit":
+              return "Form was submitted after the visit day ended";
+            case "awaiting_nightly_run":
+              return "Readings arrive next morning during nightly run";
+            case "no_reading_in_note":
+              return "Session note contains no MAPS reading";
+            default:
+              return reason.replace(/_/g, " ");
+          }
+        };
+
+        const bkEvidence = entry.action === "book_next" ? (entry.check?.evidence as any) : null;
+        const goalEvidence = entry.action === "goal" ? (entry.check?.evidence as any) : null;
 
         return (
           <TooltipProvider key={entry.id} delayDuration={150}>
@@ -211,30 +270,48 @@ const ActionsTakenList: React.FC<{
                   )}
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs max-w-xs space-y-1">
+              <TooltipContent side="top" className="text-xs max-w-xs space-y-1.5 p-2.5">
                 <p className="font-bold text-[11px]">
                   {actionName} logged by {staffName}
                 </p>
                 {entry.note && (
                   <p className="italic text-zinc-300">"{entry.note}"</p>
                 )}
-                {entry.action === "book_next" && (entry.check?.evidence as any)?.found != null && (
-                  <p className="text-[10px] text-zinc-300">
-                    {(entry.check?.evidence as any)?.claimed != null && `Claimed: ${(entry.check?.evidence as any).claimed} · `}
-                    Found: {(entry.check?.evidence as any).found} appointment{((entry.check?.evidence as any).found === 1 ? "" : "s")}
-                    {(entry.check?.evidence as any).found_bookings != null && (entry.check?.evidence as any).found_bookings !== (entry.check?.evidence as any).found && (
-                      <span className="text-zinc-400"> ({(entry.check?.evidence as any).found_bookings} bookings)</span>
+                {bkEvidence?.found != null && (
+                  <div className="text-[10px] text-zinc-300 space-y-0.5">
+                    <p>
+                      {bkEvidence.claimed != null && `Claimed: ${bkEvidence.claimed} · `}
+                      Found: {bkEvidence.found} appointment{bkEvidence.found === 1 ? "" : "s"}
+                      {bkEvidence.needed != null && ` (needed ${bkEvidence.needed})`}
+                      {bkEvidence.found_bookings != null && bkEvidence.found_bookings !== bkEvidence.found && (
+                        <span className="text-zinc-400"> • {bkEvidence.found_bookings} bookings</span>
+                      )}
+                    </p>
+                    {bkEvidence.found_by_client != null && bkEvidence.found_by_client > 0 && (
+                      <p className="text-sky-300">
+                        {bkEvidence.found_by_client} booked online by client (counts for desk)
+                      </p>
                     )}
+                  </div>
+                )}
+                {goalEvidence?.why && (
+                  <p className="text-[10px] text-zinc-300">
+                    <span className="text-zinc-400">Why: </span>"{goalEvidence.why}"
+                  </p>
+                )}
+                {goalEvidence?.template_clients != null && goalEvidence.template_clients >= 3 && (
+                  <p className="text-[10px] text-amber-300">
+                    Template phrasing used for {goalEvidence.template_clients} clients
                   </p>
                 )}
                 {entry.check?.reason && (
-                  <p className="text-[10px] text-zinc-300 capitalize">
-                    Reason: {entry.check.reason.replace(/_/g, " ")}
+                  <p className="text-[10px] text-zinc-200">
+                    {reasonHumanText(entry.check.reason)}
                   </p>
                 )}
                 {checkStatus === "pending" && (
                   <p className="text-[9px] text-zinc-400">
-                    Normal on the day. Robot verifies overnight or at daytime run.
+                    Normal on the day. System verifies overnight or at daytime run.
                   </p>
                 )}
               </TooltipContent>
