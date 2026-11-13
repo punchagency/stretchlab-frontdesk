@@ -13,11 +13,37 @@ interface CustomJwtPayload extends JwtPayload {
   clubready_accounts?: any[];
 }
 
+// Used only when a token has no readable `exp` claim.
+const FALLBACK_TOKEN_LIFETIME_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Returns the expiry date encoded in the JWT's `exp` claim, so the cookie
+ * lives exactly as long as the token the backend issued (single source of truth).
+ */
+export const getTokenExpiry = (token: string): Date => {
+  try {
+    const { exp } = jwtDecode<JwtPayload>(token);
+    if (typeof exp === "number") {
+      return new Date(exp * 1000);
+    }
+  } catch {
+    // Fall through to the fallback lifetime
+  }
+  return new Date(Date.now() + FALLBACK_TOKEN_LIFETIME_MS);
+};
+
+/**
+ * True when the token is missing, unreadable, or expires within `withinMs`.
+ */
+export const isTokenExpiringSoon = (token: string | null, withinMs: number): boolean => {
+  if (!token) return true;
+  return getTokenExpiry(token).getTime() - Date.now() <= withinMs;
+};
+
 const cookieDomain = import.meta.env.VITE_COOKIE_DOMAIN;
 
 export const setUserCookie = (token: string): void => {
-  const expireAt = new Date();
-  expireAt.setHours(expireAt.getHours() + 1);
+  const expireAt = getTokenExpiry(token);
   Cookies.set("token", token, {
     expires: expireAt,
     domain: cookieDomain,

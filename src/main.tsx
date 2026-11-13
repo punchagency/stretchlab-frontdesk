@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import "./index.css";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage, ClientActionsPage, ClientIntakesPage, OpportunitiesPage } from "./pages";
+import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage, ClientActionsPage, ClientIntakesPage, OpportunitiesPage, AbleCarePage } from "./pages";
 import { AppLayout } from "./components/shared";
 import { useVersionCheck } from "./hooks/useVersionCheck";
 
@@ -57,6 +57,15 @@ const router = createBrowserRouter([
     element: (
       <AppLayout>
         <ClientIntakesPage />
+      </AppLayout>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/ablecare",
+    element: (
+      <AppLayout>
+        <AbleCarePage />
       </AppLayout>
     ),
     errorElement: <ErrorPage />,

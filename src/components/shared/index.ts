@@ -13,6 +13,7 @@ export * from "./FilterDropdown";
 export * from "./IntakeEmailModal";
 export * from "./IntakeInsightsModal";
 export * from "./IntakeConversionTrendChart";
+export * from "./SessionRestoreScreen";
 
 
 
