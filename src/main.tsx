@@ -4,9 +4,10 @@ import { Toaster } from "sonner";
 import "./index.css";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage, ClientActionsPage, ClientIntakesPage, OpportunitiesPage } from "./pages";
+import { Home, Login, Rewards, NotFound, AcceptInvite, ErrorPage, ReviewInbox, GoalsPage, ReviewsPage, ClientActionsPage, ClientIntakesPage, OpportunitiesPage, AbleCarePage } from "./pages";
 import { AppLayout } from "./components/shared";
 import { useVersionCheck } from "./hooks/useVersionCheck";
+import { canAccessAbleCare, getUserInfo } from "./utils/user";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,6 +22,13 @@ const queryClient = new QueryClient({
 // Wrapper to run the version check hook at root level
 const VersionGuard = ({ children }: { children: React.ReactNode }) => {
   useVersionCheck();
+  return <>{children}</>;
+};
+
+const AbleCareGuard = ({ children }: { children: React.ReactNode }) => {
+  if (!canAccessAbleCare(getUserInfo())) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 };
 
@@ -58,6 +66,17 @@ const router = createBrowserRouter([
       <AppLayout>
         <ClientIntakesPage />
       </AppLayout>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/ablecare",
+    element: (
+      <AbleCareGuard>
+        <AppLayout>
+          <AbleCarePage />
+        </AppLayout>
+      </AbleCareGuard>
     ),
     errorElement: <ErrorPage />,
   },

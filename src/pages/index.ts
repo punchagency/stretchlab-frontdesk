@@ -11,3 +11,4 @@ export * from "./ReviewsPage";
 export * from "./ClientActionsPage";
 export * from "./ClientIntakesPage";
 export * from "./OpportunitiesPage";
+export * from "./AbleCarePage";

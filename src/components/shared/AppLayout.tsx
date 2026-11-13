@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router";
 import { Sidebar } from "./Sidebar";
+import { SessionRestoreScreen } from "./SessionRestoreScreen";
 import { Menu, Sparkles } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
+import { deleteUserCookie, getRefreshToken, getUserCookie } from "../../utils/user";
+import { refreshAccessToken, startTokenRefreshScheduler } from "../../service/tokenRefresh";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -9,6 +13,40 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [authState, setAuthState] = useState<"checking" | "ready" | "unauthenticated">(() =>
+    getUserCookie() ? "ready" : getRefreshToken() ? "checking" : "unauthenticated"
+  );
+
+  useEffect(() => {
+    if (authState !== "checking") return;
+    let cancelled = false;
+    refreshAccessToken()
+      .then(() => {
+        if (!cancelled) setAuthState(getUserCookie() ? "ready" : "unauthenticated");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          deleteUserCookie();
+          setAuthState("unauthenticated");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authState]);
+
+  useEffect(() => {
+    if (authState !== "ready") return;
+    return startTokenRefreshScheduler();
+  }, [authState]);
+
+  if (authState === "checking") {
+    return <SessionRestoreScreen />;
+  }
+
+  if (authState === "unauthenticated") {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-base flex flex-col md:flex-row antialiased">

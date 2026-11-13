@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { FollowUp, IntakeSubmission } from "./home";
+import { AbleCareBadgeStatus } from "./ablecare";
 
 export type Day = string; // "YYYY-MM-DD", studio-local
 export type UtcStamp = string; // no zone, UTC: new Date(s + "Z")
@@ -222,6 +223,7 @@ export interface ClientActionRow {
   badges: ActionBadge[];
   actions_taken: ActionEntry[] | null;
   must_get?: MustGetItem[];
+  able_care?: AbleCareBadgeStatus | null;
 }
 
 export interface MustGetItem {
