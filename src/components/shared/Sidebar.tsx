@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { MapPin, LogOut, X, ExternalLink, MessageSquare, Target, FileText, HeartPulse } from "lucide-react";
 import logo from "../../assets/images/stretchnote.png";
-import { deleteUserCookie, getUserInfo, hasRole } from "../../utils/user";
+import { deleteUserCookie, getUserInfo, hasRole, canAccessAbleCare } from "../../utils/user";
 import { logout } from "../../service/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDeskStaff, DeskStaffMember } from "../../service/clientActions";
@@ -71,6 +71,10 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const queryClient = useQueryClient();
   const canAccessAdmin = hasRole(userInfo, [1, 2, 4]);
   const canAccessNoteApp = hasRole(userInfo, [3]);
+  const showAbleCare = canAccessAbleCare(userInfo);
+  const visibleMenuItems = menuItems.filter(
+    (item) => item.path !== "/ablecare" || showAbleCare
+  );
 
   // Fetch Front Desk Staff to resolve logged-in frontdesk name
   const { data: deskStaffResponse } = useQuery({
@@ -159,7 +163,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
-        {menuItems.map((item) => {
+        {visibleMenuItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
 

@@ -88,6 +88,12 @@ export const canAccessInbox = (user: CustomJwtPayload | null): boolean => {
   return hasRole(user, [1, 2, 4, 6]);
 };
 
+const ABLECARE_ALLOWED_EMAIL = "brian.goldstein@stretchlab.com";
+
+export const canAccessAbleCare = (user: CustomJwtPayload | null): boolean => {
+  return user?.email?.toLowerCase().trim() === ABLECARE_ALLOWED_EMAIL;
+};
+
 export const setRefreshToken = (token: string): void => {
   const expireAt = new Date();
   expireAt.setDate(expireAt.getDate() + 7);
