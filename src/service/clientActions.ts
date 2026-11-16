@@ -177,6 +177,36 @@ export interface ActionEntry {
   check?: ActionCheck | null;
 }
 
+export type SkipActionKind = "maps" | "book_next" | "goal";
+
+export interface SkipReasonOption {
+  reason: string;
+  label: string;
+}
+
+export interface SkipEntry {
+  id: number;
+  action: SkipActionKind;
+  reason: string;
+  reason_label: string;
+  note: string | null;
+  booking_date: Day;
+  booking_id: string | null;
+  location_name: string | null;
+  store_id: string | null;
+  client_goal_id: number | null;
+  done_by: number;
+  done_by_name: string | null;
+  staff_id: number | null;
+  staff_name: string | null;
+  done_at: UtcStamp;
+  undone_at: UtcStamp | null;
+  undone_by: number | null;
+  undone_by_name: string | null;
+  undone_staff_id: number | null;
+  undone_staff_name: string | null;
+}
+
 export interface DeskStaffMember {
   id: number;
   name: string;
@@ -222,6 +252,7 @@ export interface ClientActionRow {
   booking_guidance?: BookingGuidance | null;
   badges: ActionBadge[];
   actions_taken: ActionEntry[] | null;
+  skips?: SkipEntry[] | null;
   must_get?: MustGetItem[];
   able_care?: AbleCareBadgeStatus | null;
 }
@@ -232,6 +263,8 @@ export interface MustGetItem {
   done: boolean | null; // true if logged today, false if open/undone, null if error
   entry: ActionEntry | null; // the actions_taken entry that did it
   can_undo: boolean; // true for intake_form, maps, book_next; false for goal
+  skipped?: SkipEntry | null;
+  can_skip?: boolean;
 }
 
 export interface ClientActionsSummary {
@@ -251,6 +284,7 @@ export interface ClientActionsSummary {
     low: number;
   };
   actions_taken?: Record<ActionKind, number> | null;
+  skips?: Partial<Record<SkipActionKind, number>> | null;
 }
 
 export interface ClientActionsWindow {
@@ -261,6 +295,7 @@ export interface ClientActionsWindow {
   maps_due_after_days: number;
   future_bookings_target: number | null;
   goal_update_after_days: number;
+  skip_reasons?: Partial<Record<SkipActionKind, SkipReasonOption[]>>;
 }
 
 export interface ClientActionsData {
@@ -393,6 +428,48 @@ export const undoClientAction = async (entryId: number, staffId?: number) => {
   return response.data;
 };
 
+export const getSkipReasons = async () => {
+  const response = await api.get<{
+    status: string;
+    data: Partial<Record<SkipActionKind, SkipReasonOption[]>>;
+  }>("/frontdesk/client-actions/skip-reasons");
+  return response.data;
+};
+
+export const skipClientAction = async (
+  row: ClientActionRow,
+  day: Day,
+  action: SkipActionKind,
+  reason: string,
+  extra: {
+    note?: string;
+    staff_id?: number;
+  } = {}
+) => {
+  const payload: Record<string, any> = {
+    action,
+    reason,
+    clubready_user_id: row.clubready_user_id,
+    date: day,
+    ...(row.booking_id ? { booking_id: row.booking_id } : {}),
+    ...extra,
+  };
+  const response = await api.post<{
+    status: string;
+    data: { skip: SkipEntry; created: boolean };
+  }>("/frontdesk/client-actions/skip", payload);
+  return response.data;
+};
+
+export const undoSkipClientAction = async (skipId: number, staffId?: number) => {
+  const payload = staffId ? { staff_id: staffId } : {};
+  const response = await api.post<{
+    status: string;
+    data: { skip: SkipEntry; undone: boolean };
+  }>(`/frontdesk/client-actions/skip/${skipId}/undo`, payload);
+  return response.data;
+};
+
 export const toBook = (row: ClientActionRow) =>
   row.future_bookings.target != null && row.future_bookings.count != null
     ? Math.max(row.future_bookings.target - row.future_bookings.count, 0)
@@ -416,14 +493,14 @@ export const actionRowKey = (row: ClientActionRow, index: number): string =>
 
 export const isRowCompleted = (row: ClientActionRow): boolean => {
   if (row.must_get && row.must_get.length > 0) {
-    return row.must_get.every((item) => item.done === true);
+    return row.must_get.every((item) => item.done === true || Boolean(item.skipped));
   }
   return row.badges.length === 0;
 };
 
 export const getRowPendingActionsCount = (row: ClientActionRow): number => {
   if (row.must_get && row.must_get.length > 0) {
-    return row.must_get.filter((item) => !item.done).length;
+    return row.must_get.filter((item) => !item.done && !item.skipped).length;
   }
   return row.badges.length;
 };

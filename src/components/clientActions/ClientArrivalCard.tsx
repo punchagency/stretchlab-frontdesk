@@ -18,6 +18,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ClientActionRow,
   ActionEntry,
+  SkipActionKind,
+  SkipEntry,
+  SkipReasonOption,
   getDeskStaff,
   isRowCompleted,
   getRowPendingActionsCount,
@@ -41,8 +44,18 @@ export interface ClientArrivalCardProps {
   onLogMaps?: (row: ClientActionRow) => void;
   onLogBookNext?: (row: ClientActionRow, count?: number) => void;
   onUndoAction?: (entry: ActionEntry) => void;
+  skipReasons?: Partial<Record<SkipActionKind, SkipReasonOption[]>>;
+  onSkipAction?: (
+    row: ClientActionRow,
+    action: SkipActionKind,
+    reason: string,
+    note?: string
+  ) => void;
+  onUndoSkip?: (skip: SkipEntry) => void;
   isLoggingAction?: boolean;
+  isSkippingAction?: boolean;
   undoingEntryId?: number | null;
+  undoingSkipId?: number | null;
   isFetchingActions?: boolean;
   isToggling: boolean;
   copiedId: string | null;
@@ -323,6 +336,88 @@ const ActionsTakenList: React.FC<{
   );
 };
 
+const SKIP_ACTION_LABELS: Record<SkipActionKind, string> = {
+  maps: "MAPS",
+  book_next: "Book Next",
+  goal: "Goal",
+};
+
+const SkippedActionsList: React.FC<{
+  skips?: SkipEntry[] | null;
+  onUndoSkip?: (skip: SkipEntry) => void;
+  undoingSkipId?: number | null;
+  isFetchingActions?: boolean;
+}> = ({ skips, onUndoSkip, undoingSkipId, isFetchingActions }) => {
+  if (!skips || skips.length === 0) return null;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-neutral-tertiary/60 flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 mr-1">
+        Not Done:
+      </span>
+      {skips.map((skip) => {
+        const staffName = skip.staff_name || skip.done_by_name || "Owner";
+        const timeStr = formatUtcTime(skip.done_at);
+        const actionLabel = SKIP_ACTION_LABELS[skip.action] || skip.action;
+        const isUndoDisabled = undoingSkipId === skip.id || isFetchingActions;
+
+        return (
+          <TooltipProvider key={skip.id} delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-amber-50/90 text-amber-900 border border-amber-200 shadow-2xs">
+                  <span className="font-bold">{actionLabel}</span>
+                  <span>· {skip.reason_label}</span>
+                  <span className="text-amber-700/80 text-[10px]">
+                    ({staffName} {timeStr})
+                  </span>
+                  {onUndoSkip && (
+                    <button
+                      type="button"
+                      disabled={isUndoDisabled}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUndoSkip(skip);
+                      }}
+                      className={`ml-0.5 p-0.5 rounded transition-colors ${
+                        isUndoDisabled
+                          ? "text-amber-300 opacity-40 cursor-not-allowed"
+                          : "text-amber-600 hover:text-rose-600 cursor-pointer"
+                      }`}
+                      title={
+                        undoingSkipId === skip.id
+                          ? "Undoing..."
+                          : "Undo not-completed reason"
+                      }
+                    >
+                      {undoingSkipId === skip.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
+                      ) : (
+                        <Undo2 className="w-3 h-3" />
+                      )}
+                    </button>
+                  )}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-xs space-y-1 p-2.5">
+                <p className="font-bold text-[11px]">
+                  {actionLabel} marked not done by {staffName}
+                </p>
+                <p className="text-[11px] text-zinc-200">
+                  Reason: <strong>{skip.reason_label}</strong>
+                </p>
+                {skip.note && (
+                  <p className="italic text-zinc-300">"{skip.note}"</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      })}
+    </div>
+  );
+};
+
 export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   row,
   isCollapsed,
@@ -333,8 +428,13 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   onLogMaps,
   onLogBookNext,
   onUndoAction,
+  skipReasons,
+  onSkipAction,
+  onUndoSkip,
   isLoggingAction,
+  isSkippingAction,
   undoingEntryId,
+  undoingSkipId,
   isFetchingActions,
   isToggling,
   copiedId,
@@ -348,9 +448,9 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
   const hasActions = pendingActionsCount > 0;
   const hasGoalBadge =
     row.badges.some((b) => b.startsWith("goal_")) ||
-    (row.must_get?.some((m) => m.action === "goal" && !m.done) ?? false);
+    (row.must_get?.some((m) => m.action === "goal" && !m.done && !m.skipped) ?? false);
   const pendingMustGet = row.must_get
-    ? row.must_get.filter((item) => !item.done)
+    ? row.must_get.filter((item) => !item.done && !item.skipped)
     : [];
 
   // Collapsed accordion strip (compact view when tasks are completed or slot is in the past)
@@ -588,13 +688,16 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
                       key={item.action}
                       item={item}
                       row={row}
+                      skipReasons={skipReasons}
                       onGoalClick={onGoalClick}
                       onToggleFollowUp={onToggleFollowUp}
                       onLogMaps={onLogMaps}
                       onLogBookNext={onLogBookNext}
                       onUndoAction={onUndoAction}
+                      onSkipAction={onSkipAction}
                       isToggling={isToggling}
                       isLoggingAction={isLoggingAction}
+                      isSkippingAction={isSkippingAction}
                       undoingEntryId={undoingEntryId}
                     />
                   ))}
@@ -750,6 +853,12 @@ export const ClientArrivalCard: React.FC<ClientArrivalCardProps> = ({
         undoingEntryId={undoingEntryId}
         isFetchingActions={isFetchingActions}
       />
+      <SkippedActionsList
+        skips={row.skips}
+        onUndoSkip={onUndoSkip}
+        undoingSkipId={undoingSkipId}
+        isFetchingActions={isFetchingActions}
+      />
     </div>
   );
 };
@@ -762,8 +871,13 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   onLogMaps,
   onLogBookNext,
   onUndoAction,
+  skipReasons,
+  onSkipAction,
+  onUndoSkip,
   isLoggingAction,
+  isSkippingAction,
   undoingEntryId,
+  undoingSkipId,
   isFetchingActions,
   isToggling,
   copiedId,
@@ -777,9 +891,9 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
   const hasActions = pendingActionsCount > 0;
   const hasGoalBadge =
     row.badges.some((b) => b.startsWith("goal_")) ||
-    (row.must_get?.some((m) => m.action === "goal" && !m.done) ?? false);
+    (row.must_get?.some((m) => m.action === "goal" && !m.done && !m.skipped) ?? false);
   const gridPendingMustGet = row.must_get
-    ? row.must_get.filter((item) => !item.done)
+    ? row.must_get.filter((item) => !item.done && !item.skipped)
     : [];
 
   return (
@@ -964,13 +1078,16 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
                     key={item.action}
                     item={item}
                     row={row}
+                    skipReasons={skipReasons}
                     onGoalClick={onGoalClick}
                     onToggleFollowUp={onToggleFollowUp}
                     onLogMaps={onLogMaps}
                     onLogBookNext={onLogBookNext}
                     onUndoAction={onUndoAction}
+                    onSkipAction={onSkipAction}
                     isToggling={isToggling}
                     isLoggingAction={isLoggingAction}
+                    isSkippingAction={isSkippingAction}
                     undoingEntryId={undoingEntryId}
                   />
                 ))}
@@ -1009,6 +1126,12 @@ export const ClientActionGridCard: React.FC<ClientArrivalCardProps> = ({
         actions={row.actions_taken}
         onUndoAction={onUndoAction}
         undoingEntryId={undoingEntryId}
+        isFetchingActions={isFetchingActions}
+      />
+      <SkippedActionsList
+        skips={row.skips}
+        onUndoSkip={onUndoSkip}
+        undoingSkipId={undoingSkipId}
         isFetchingActions={isFetchingActions}
       />
 
