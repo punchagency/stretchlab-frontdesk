@@ -29,7 +29,11 @@ import {
   getDeskStaff,
   logClientAction,
   undoClientAction,
+  skipClientAction,
+  undoSkipClientAction,
   ActionEntry,
+  SkipActionKind,
+  SkipEntry,
   DeskStaffMember,
   isRowCompleted,
 } from "../../service/clientActions";
@@ -87,6 +91,7 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
   const [viewMode, setViewMode] = useState<"timeline" | "cards">("timeline");
 
   const [undoingEntryId, setUndoingEntryId] = useState<number | null>(null);
+  const [undoingSkipId, setUndoingSkipId] = useState<number | null>(null);
 
   // Modals state
   const [goalModalState, setGoalModalState] = useState<{
@@ -891,6 +896,209 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     },
   });
 
+  const skipActionMutation = useMutation({
+    mutationFn: ({
+      row,
+      action,
+      reason,
+      note,
+    }: {
+      row: ClientActionRow;
+      action: SkipActionKind;
+      reason: string;
+      note?: string;
+    }) => {
+      return skipClientAction(row, selectedDate, action, reason, {
+        note,
+        staff_id: activeStaffId || undefined,
+      });
+    },
+    onMutate: async ({ row, action, reason, note }) => {
+      const actionsQueryKey = [
+        "frontdesk-client-actions",
+        selectedDate,
+        selectedLocation || undefined,
+      ];
+      await queryClient.cancelQueries({ queryKey: actionsQueryKey });
+      const previousData =
+        queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
+
+      const staffMember =
+        deskStaffList.find((s) => s.id === activeStaffId) || currentStaff;
+      const userInfo = getUserInfo();
+      const staffMemberName =
+        staffMember?.name ||
+        staffMember?.email ||
+        userInfo?.name ||
+        userInfo?.email ||
+        "Front Desk";
+
+      const reasonLabel =
+        windowData?.skip_reasons?.[action]?.find(
+          (r) => r.reason === reason
+        )?.label || reason;
+
+      const tempSkip: SkipEntry = {
+        id: Date.now(),
+        action,
+        reason,
+        reason_label: reasonLabel,
+        note: note || null,
+        booking_date: selectedDate,
+        booking_id: row.booking_id || null,
+        location_name: row.location_name || null,
+        store_id: null,
+        client_goal_id: null,
+        done_by: 0,
+        done_by_name: staffMemberName,
+        staff_id: activeStaffId || null,
+        staff_name: staffMember
+          ? staffMember.name || staffMember.email || null
+          : staffMemberName,
+        done_at: new Date().toISOString(),
+        undone_at: null,
+        undone_by: null,
+        undone_by_name: null,
+        undone_staff_id: null,
+        undone_staff_name: null,
+      };
+
+      if (previousData?.data) {
+        const updatedBookings = previousData.data.bookings.map((b) => {
+          const isSameClient =
+            row.clubready_user_id != null &&
+            b.clubready_user_id != null &&
+            String(b.clubready_user_id) === String(row.clubready_user_id);
+          const isSameRow =
+            isSameClient ||
+            (row.booking_id != null &&
+              b.booking_id != null &&
+              String(b.booking_id) === String(row.booking_id));
+          if (!isSameRow) return b;
+
+          return {
+            ...b,
+            skips: [tempSkip, ...(b.skips || [])],
+            must_get: b.must_get?.map((item) =>
+              item.action === action
+                ? { ...item, skipped: tempSkip, can_skip: false }
+                : item
+            ),
+          };
+        });
+
+        queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
+          ...previousData,
+          data: {
+            ...previousData.data,
+            bookings: updatedBookings,
+          },
+        });
+      }
+
+      return { previousData, actionsQueryKey };
+    },
+    onSuccess: (res) => {
+      if (res.data?.created) {
+        renderSuccessToast(
+          `Marked not done: ${res.data.skip.reason_label}`
+        );
+      } else {
+        renderSuccessToast("Already marked not done for today.");
+      }
+    },
+    onError: (err: any, _vars, context) => {
+      if (context?.previousData && context?.actionsQueryKey) {
+        queryClient.setQueryData(context.actionsQueryKey, context.previousData);
+      }
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to record reason.";
+      renderErrorToast(msg);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["frontdesk-client-actions"],
+      });
+    },
+  });
+
+  const undoSkipMutation = useMutation({
+    mutationFn: ({ skipId }: { skipId: number }) => {
+      setUndoingSkipId(skipId);
+      return undoSkipClientAction(skipId, activeStaffId || undefined);
+    },
+    onMutate: async ({ skipId }) => {
+      const actionsQueryKey = [
+        "frontdesk-client-actions",
+        selectedDate,
+        selectedLocation || undefined,
+      ];
+      await queryClient.cancelQueries({ queryKey: actionsQueryKey });
+      const previousData =
+        queryClient.getQueryData<ClientActionsResponse>(actionsQueryKey);
+
+      if (previousData?.data) {
+        const updatedBookings = previousData.data.bookings.map((b) => {
+          const hasSkip =
+            b.skips?.some((s) => String(s.id) === String(skipId)) ||
+            b.must_get?.some(
+              (m) => m.skipped && String(m.skipped.id) === String(skipId)
+            );
+          if (!hasSkip) return b;
+
+          return {
+            ...b,
+            skips: (b.skips || []).filter(
+              (s) => String(s.id) !== String(skipId)
+            ),
+            must_get: b.must_get?.map((item) =>
+              item.skipped && String(item.skipped.id) === String(skipId)
+                ? {
+                    ...item,
+                    skipped: null,
+                    can_skip: item.action !== "intake_form",
+                  }
+                : item
+            ),
+          };
+        });
+
+        queryClient.setQueryData<ClientActionsResponse>(actionsQueryKey, {
+          ...previousData,
+          data: {
+            ...previousData.data,
+            bookings: updatedBookings,
+          },
+        });
+      }
+
+      return { previousData, actionsQueryKey };
+    },
+    onSuccess: (res) => {
+      if (res.data?.undone) {
+        renderSuccessToast("Not-completed reason withdrawn.");
+      }
+    },
+    onError: (err: any, _vars, context) => {
+      if (context?.previousData && context?.actionsQueryKey) {
+        queryClient.setQueryData(context.actionsQueryKey, context.previousData);
+      }
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Failed to withdraw reason.";
+      renderErrorToast(msg);
+    },
+    onSettled: () => {
+      setUndoingSkipId(null);
+      queryClient.invalidateQueries({
+        queryKey: ["frontdesk-client-actions"],
+      });
+    },
+  });
+
   const handleLogMaps = (row: ClientActionRow) => {
     logActionMutation.mutate({ row, action: "maps" });
   };
@@ -903,15 +1111,31 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
     });
   };
 
+  const handleSkipAction = (
+    row: ClientActionRow,
+    action: SkipActionKind,
+    reason: string,
+    note?: string
+  ) => {
+    skipActionMutation.mutate({ row, action, reason, note });
+  };
+
   const isFetchingClientActions =
     isFetching ||
     toggleFollowUpMutation.isPending ||
     logActionMutation.isPending ||
-    undoActionMutation.isPending;
+    undoActionMutation.isPending ||
+    skipActionMutation.isPending ||
+    undoSkipMutation.isPending;
 
   const handleUndoAction = (entry: ActionEntry) => {
     if (isFetchingClientActions) return;
     undoActionMutation.mutate({ entryId: entry.id });
+  };
+
+  const handleUndoSkip = (skip: SkipEntry) => {
+    if (isFetchingClientActions) return;
+    undoSkipMutation.mutate({ skipId: skip.id });
   };
 
   const formatUtcDateTime = (stamp?: string | null) => {
@@ -1285,8 +1509,13 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
           onLogMaps={handleLogMaps}
           onLogBookNext={handleLogBookNext}
           onUndoAction={handleUndoAction}
+          skipReasons={windowData?.skip_reasons}
+          onSkipAction={handleSkipAction}
+          onUndoSkip={handleUndoSkip}
           isLoggingAction={logActionMutation.isPending}
+          isSkippingAction={skipActionMutation.isPending}
           undoingEntryId={undoingEntryId}
+          undoingSkipId={undoingSkipId}
           isFetchingActions={isFetchingClientActions}
           togglingRowKey={togglingRowKey}
           copiedId={copiedId}
@@ -1352,8 +1581,13 @@ export const ClientActionsTab: React.FC<ClientActionsTabProps> = ({
                     onLogMaps={handleLogMaps}
                     onLogBookNext={handleLogBookNext}
                     onUndoAction={handleUndoAction}
+                    skipReasons={windowData?.skip_reasons}
+                    onSkipAction={handleSkipAction}
+                    onUndoSkip={handleUndoSkip}
                     isLoggingAction={logActionMutation.isPending}
+                    isSkippingAction={skipActionMutation.isPending}
                     undoingEntryId={undoingEntryId}
+                    undoingSkipId={undoingSkipId}
                     isFetchingActions={isFetchingClientActions}
                     isToggling={Boolean(
                       togglingRowKey &&

@@ -13,6 +13,9 @@ import {
 import {
   ClientActionRow,
   ActionEntry,
+  SkipActionKind,
+  SkipEntry,
+  SkipReasonOption,
   actionRowKey,
   isRowCompleted,
   getRowPendingActionsCount,
@@ -30,8 +33,18 @@ interface ClientArrivalTimelineProps {
   onLogMaps?: (row: ClientActionRow) => void;
   onLogBookNext?: (row: ClientActionRow, count?: number) => void;
   onUndoAction?: (entry: ActionEntry) => void;
+  skipReasons?: Partial<Record<SkipActionKind, SkipReasonOption[]>>;
+  onSkipAction?: (
+    row: ClientActionRow,
+    action: SkipActionKind,
+    reason: string,
+    note?: string
+  ) => void;
+  onUndoSkip?: (skip: SkipEntry) => void;
   isLoggingAction?: boolean;
+  isSkippingAction?: boolean;
   undoingEntryId?: number | null;
+  undoingSkipId?: number | null;
   isFetchingActions?: boolean;
   togglingRowKey: string | null;
   copiedId: string | null;
@@ -86,8 +99,13 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
   onLogMaps,
   onLogBookNext,
   onUndoAction,
+  skipReasons,
+  onSkipAction,
+  onUndoSkip,
   isLoggingAction,
+  isSkippingAction,
   undoingEntryId,
+  undoingSkipId,
   isFetchingActions,
   togglingRowKey,
   copiedId,
@@ -740,8 +758,13 @@ export const ClientArrivalTimeline: React.FC<ClientArrivalTimelineProps> = ({
                         onLogMaps={onLogMaps}
                         onLogBookNext={onLogBookNext}
                         onUndoAction={onUndoAction}
+                        skipReasons={skipReasons}
+                        onSkipAction={onSkipAction}
+                        onUndoSkip={onUndoSkip}
                         isLoggingAction={isLoggingAction}
+                        isSkippingAction={isSkippingAction}
                         undoingEntryId={undoingEntryId}
+                        undoingSkipId={undoingSkipId}
                         isFetchingActions={isFetchingActions}
                         isToggling={isToggling}
                         copiedId={copiedId}
